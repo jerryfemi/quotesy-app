@@ -26,46 +26,151 @@ JUNK_PATTERNS = re.compile(
 )
 
 SECTION_CATEGORY_MAP = {
-    # literature / philosophy
-    "novels": "Literature",
-    "works": "Literature",
-    "letters": "Literature/Personal",
-    "speeches": "Speeches",
-    "interviews": "Interviews",
-    # thematic
-    "love": "Love",
-    "life": "Life",
-    "death": "Death",
-    "god": "Religion/God",
-    "religion": "Religion",
-    "faith": "Religion/Faith",
-    "philosophy": "Philosophy",
-    "politics": "Politics",
-    "society": "Society",
-    "human nature": "Human Nature",
-    "suffering": "Existential/Suffering",
-    "freedom": "Freedom",
-    "truth": "Truth",
-    "beauty": "Beauty",
-    "time": "Time",
-    "science": "Science",
-    "war": "War",
-    "money": "Economy",
+    # literature / philosophy — map to closest app category
+    "novels": "Existential",
+    "works": "Existential",
+    "letters": "Psychology & Self",
+    "diary": "Psychology & Self",
+    "speeches": "War & Epic",
+    "interviews": "Wit & Wisdom",
+    # thematic (aligned to app categories)
+    "love": "Love & Yearning",
+    "life": "Wit & Wisdom",
+    "death": "Existential",
+    "god": "Spirituality & Faith",
+    "religion": "Spirituality & Faith",
+    "faith": "Spirituality & Faith",
+    "philosophy": "Existential",
+    "politics": "War & Epic",
+    "society": "Wit & Wisdom",
+    "human nature": "Psychology & Self",
+    "suffering": "Existential",
+    "freedom": "War & Epic",
+    "truth": "Wit & Wisdom",
+    "beauty": "Love & Yearning",
+    "time": "Existential",
+    "science": "Wit & Wisdom",
+    "war": "War & Epic",
+    "money": "Wit & Wisdom",
+    "psychology": "Psychology & Self",
+    "soul": "Spirituality & Faith",
+    "poetry": "Love & Yearning",
+    "art": "Love & Yearning",
+    "morality": "Spirituality & Faith",
+    "wisdom": "Wit & Wisdom",
+    "humor": "Wit & Wisdom",
+    "nature": "Love & Yearning",
+}
+
+# ── Keyword-based category fallback (scans quote TEXT) ─────────────────────────
+
+KEYWORD_CATEGORIES = {
+    "Spirituality & Faith": [
+        "christ", "god", "faith", "soul", "prayer", "divine", "sin",
+        "holy", "heaven", "hell", "sacred", "eternal", "salvation",
+        "grace", "worship", "spirit", "blessed", "resurrection",
+        "scripture", "prophets", "church", "believe", "saviour",
+        "miracle", "redemption", "gospel", "mercy", "angels",
+        "creator", "almighty", "righteous", "pious", "temple",
+        "sermon", "devout", "communion", "psalm", "bible",
+    ],
+    "Love & Yearning": [
+        "love", "heart", "longing", "beloved", "passion", "desire",
+        "tenderness", "kiss", "embrace", "yearning", "affection",
+        "devotion", "beauty", "romance", "lover", "intimacy",
+        "wedding", "marriage", "adore", "gentle", "compassion",
+        "tears", "weep", "sorrow", "miss you", "together",
+        "apart", "wound", "cherish", "caress", "warmth",
+        "tender", "rose", "flower", "sweet", "darling",
+        "loneliness", "absence", "grief", "mourn",
+    ],
+    "Existential": [
+        "absurd", "meaningless", "existence", "suffering", "despair",
+        "void", "nothingness", "anxiety", "dread", "alienation",
+        "fate", "doom", "mortality", "futile", "hopeless",
+        "anguish", "solitude", "burden", "abyss", "death",
+        "die", "dying", "grave", "darkness", "chaos",
+        "purpose", "meaning", "reason", "why", "question",
+        "truth", "lie", "reality", "nothing", "everything",
+        "impossible", "absurdity", "tragedy", "tragic", "finite",
+        "infinite", "eternity", "time", "end", "beginning",
+        "human", "mankind", "humanity", "civilization", "world",
+        "life", "live", "living", "born", "creation",
+        "philosophy", "philosopher", "think", "thought", "reason",
+        "cruel", "pain", "torment", "misery", "wretched",
+    ],
+    "Psychology & Self": [
+        "unconscious", "shadow", "ego", "psyche", "dream", "self",
+        "consciousness", "instinct", "archetype", "persona",
+        "identity", "mind", "madness", "insanity", "neurosis",
+        "repression", "memory", "illusion", "perception",
+        "character", "nature", "understand", "feeling", "emotion",
+        "fear", "anger", "guilt", "shame", "pride",
+        "desire", "impulse", "motive", "behavior", "habit",
+        "change", "grow", "become", "transform", "accept",
+        "deny", "resist", "struggle", "inner", "within",
+        "mirror", "face", "mask", "pretend", "hide",
+        "strength", "weakness", "courage", "coward", "honest",
+        "aware", "realize", "discover", "learn", "teach",
+        "judge", "blame", "forgive", "responsible",
+    ],
+    "War & Epic": [
+        "war", "soldier", "battle", "power", "empire", "conquer",
+        "sword", "army", "victory", "defeat", "commander", "enemy",
+        "revolution", "freedom", "nation", "glory", "courage",
+        "resistance", "tyranny", "king", "ruler", "fight",
+        "honour", "honor", "hero", "heroic", "brave",
+        "country", "people", "state", "govern", "political",
+        "justice", "law", "right", "defend", "protect",
+        "sacrifice", "duty", "serve", "struggle", "rebel",
+        "oppression", "liberty", "democracy", "republic",
+    ],
+    "Wit & Wisdom": [
+        "fool", "wise", "laugh", "clever", "irony", "jest",
+        "humor", "wit", "satire", "common sense", "experience",
+        "education", "knowledge", "opinion", "society", "money",
+        "success", "failure", "habit", "virtue", "advice",
+        "man", "woman", "men", "women", "people",
+        "always", "never", "everyone", "nobody", "secret",
+        "true", "false", "simple", "difficult", "easy",
+        "rich", "poor", "young", "old", "age",
+        "book", "read", "write", "word", "speak",
+        "friend", "friendship", "enemy", "marriage", "work",
+        "happy", "happiness", "pleasure", "enjoy", "comfort",
+    ],
 }
 
 
-def infer_category(section_heading: str, author_name: str) -> str:
-    """Map a section heading to a friendly category label."""
+def infer_category_from_text(quote_text: str) -> str:
+    """Scan the quote text for keywords and return the best-matching category."""
+    text_lower = quote_text.lower()
+    scores: dict[str, int] = {cat: 0 for cat in KEYWORD_CATEGORIES}
+
+    for category, keywords in KEYWORD_CATEGORIES.items():
+        for kw in keywords:
+            if kw in text_lower:
+                scores[category] += 1
+
+    best_cat = max(scores, key=scores.get)
+    if scores[best_cat] > 0:
+        return best_cat
+    return "General"
+
+
+def infer_category(section_heading: str, author_name: str, quote_text: str = "") -> str:
+    """
+    Map a section heading to a category label.
+    Falls back to keyword-scanning the quote text if the heading is uninformative.
+    """
     heading_lower = section_heading.lower()
     for keyword, category in SECTION_CATEGORY_MAP.items():
         if keyword in heading_lower:
             return category
-    # Fall back to the raw heading if it's informative, else author-based
-    if len(section_heading) > 2 and section_heading.lower() not in (
-        "quotes", "quotations", "sourced", "unsourced", "attributed",
-        "misattributed", "see also",
-    ):
-        return section_heading.title()
+
+    # Scan the actual quote text for keyword matches
+    if quote_text:
+        return infer_category_from_text(quote_text)
+
     return "General"
 
 
@@ -85,6 +190,10 @@ def is_valid_quote(text: str, min_length: int = 40) -> bool:
         return False
     # Skip lines that are mostly numbers / dates
     if re.fullmatch(r"[\d\s\-–,.:;()]+", text):
+        return False
+    # Skip non-English quotes (Cyrillic, CJK, etc.)
+    ascii_chars = sum(1 for c in text if ord(c) < 128)
+    if ascii_chars / len(text) < 0.7:
         return False
     return True
 
@@ -130,12 +239,16 @@ def fetch_quotes_from_page(
     seen: set[str] = set()
     current_section = "General"
 
-    for element in content_div.descendants:
+    # Find all headings and list items in document order
+    elements = content_div.find_all(['h2', 'h3', 'h4', 'li'])
+
+    for element in elements:
         # Track which section we are in
         if element.name in ("h2", "h3", "h4"):
             heading_text = element.get_text(separator=" ", strip=True)
             heading_text = re.sub(r"\[edit\]", "", heading_text, flags=re.IGNORECASE).strip()
             current_section = heading_text
+            continue
 
         # Harvest quotes from list items only
         if element.name == "li":
@@ -174,7 +287,7 @@ def fetch_quotes_from_page(
                 continue
             seen.add(fingerprint)
 
-            category = infer_category(current_section, author_name)
+            category = infer_category(current_section, author_name, text)
 
             quotes.append(
                 {
