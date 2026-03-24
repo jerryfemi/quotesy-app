@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
+import 'package:device_preview/device_preview.dart';
 import 'providers/database_provider.dart';
 import 'services/database_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ProviderScope(child: QuotesyApp()));
+  runApp(
+    DevicePreview(
+      enabled: !kReleaseMode,
+      defaultDevice: Devices.android.googlePixel9,
+      builder: (context) => const ProviderScope(child: QuotesyApp()),
+    ),
+  );
 }
 
 class QuotesyApp extends ConsumerWidget {
@@ -18,6 +26,8 @@ class QuotesyApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Quotesy',
       debugShowCheckedModeBanner: false,
+      locale: DevicePreview.locale(context),
+      builder: DevicePreview.appBuilder,
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF050505),
@@ -105,20 +115,12 @@ class _ReadyScreen extends ConsumerWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          cat,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 15,
-                          ),
-                        ),
-                        Text(
-                          '${map[cat] ?? 0}',
-                          style: const TextStyle(
-                            color: Colors.white38,
-                            fontSize: 13,
-                          ),
-                        ),
+                        Text(cat,
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 15)),
+                        Text('${map[cat] ?? 0}',
+                            style: const TextStyle(
+                                color: Colors.white38, fontSize: 13)),
                       ],
                     ),
                   ),
@@ -126,8 +128,8 @@ class _ReadyScreen extends ConsumerWidget {
               ],
             ),
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) =>
-                Text('$e', style: const TextStyle(color: Colors.redAccent)),
+            error: (e, _) => Text('$e',
+                style: const TextStyle(color: Colors.redAccent)),
           ),
         ),
       ),

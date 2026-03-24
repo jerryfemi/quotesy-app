@@ -25,8 +25,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   void _onScroll() {
     final page = _pageController.page ?? 0.0;
-    // Only call setState if the value actually changed meaningfully.
-    // 0.001 threshold avoids rebuilds from floating-point noise.
     if ((page - _currentPage).abs() > 0.001) {
       setState(() => _currentPage = page);
     }
