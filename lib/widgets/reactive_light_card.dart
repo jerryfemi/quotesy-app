@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/category_style.dart';
 
-
 class ReactiveLightCard extends StatelessWidget {
   final CategoryStyle style;
 
@@ -17,6 +16,7 @@ class ReactiveLightCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final glowOpacity = (0.18 + (0.82 * focusAmount)).clamp(0.0, 1.0);
 
     final subtitleOpacity = ((focusAmount - 0.6) / 0.4).clamp(0.0, 1.0);
     final subtitleSlide = (1.0 - subtitleOpacity) * 16.0;
@@ -31,11 +31,7 @@ class ReactiveLightCard extends StatelessWidget {
           width: 1.0,
         ),
         boxShadow: const [
-          BoxShadow(
-            color: Color(0x99000000),
-            blurRadius: 24,
-            spreadRadius: 4,
-          ),
+          BoxShadow(color: Color(0x99000000), blurRadius: 24, spreadRadius: 4),
         ],
       ),
       child: ClipRRect(
@@ -43,47 +39,51 @@ class ReactiveLightCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-           //lighting
+            //lighting
             Opacity(
-              opacity: focusAmount,
+              opacity: glowOpacity,
               child: Stack(
                 fit: StackFit.expand,
                 children: style.lightLayers
-                    .map((layer) => Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            gradient: layer.gradient,
-                          ),
-                        ))
+                    .map(
+                      (layer) => Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          gradient: layer.gradient,
+                        ),
+                      ),
+                    )
                     .toList(),
               ),
             ),
 
-            // CONTENT 
+            // CONTENT
             Padding(
               padding: const EdgeInsets.all(32.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                //tag
+                  //tag
                   Text(
                     style.tagLine,
                     style: theme.textTheme.labelLarge?.copyWith(
-                      color: Colors.white
-                          .withValues(alpha: 0.35 + (0.25 * focusAmount)),
+                      color: Colors.white.withValues(
+                        alpha: 0.35 + (0.25 * focusAmount),
+                      ),
                     ),
                   ),
 
                   const SizedBox(height: 10),
 
-                  // Title 
+                  // Title
                   Text(
                     style.displayTitle,
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontSize: 34,
-                      color: Colors.white
-                          .withValues(alpha: 0.7 + (0.3 * focusAmount)),
+                      color: Colors.white.withValues(
+                        alpha: 0.7 + (0.3 * focusAmount),
+                      ),
                       height: 1.15,
                     ),
                   ),

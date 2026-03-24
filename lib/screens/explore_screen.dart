@@ -18,7 +18,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void initState() {
     super.initState();
     _pageController = PageController(
-      viewportFraction: 0.85, // Cards peek from below — creates depth
+      viewportFraction: 0.76, // Shorter cards so next one clearly peeks in view
     );
     _pageController.addListener(_onScroll);
   }
@@ -91,6 +91,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return PageView.builder(
       controller: _pageController,
       scrollDirection: Axis.vertical,
+      padEnds: true,
       itemCount: styles.length,
       itemBuilder: (context, index) {
         final distance = (_currentPage - index).abs();

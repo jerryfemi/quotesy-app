@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 import 'package:device_preview/device_preview.dart';
 import 'providers/database_provider.dart';
-import 'services/database_service.dart';
+import 'routes/app_router.dart';
+import 'theme/quotesy_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,22 +23,26 @@ class QuotesyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dbInit = ref.watch(databaseInitProvider);
+    final router = ref.watch(routerProvider);
 
-    return MaterialApp(
-      title: 'Quotesy',
-      debugShowCheckedModeBanner: false,
-      locale: DevicePreview.locale(context),
-      builder: DevicePreview.appBuilder,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF050505),
-        useMaterial3: true,
-        fontFamily: 'Inter',
+    return dbInit.when(
+      data: (_) => MaterialApp.router(
+        title: 'Quotesy',
+        debugShowCheckedModeBanner: false,
+        locale: DevicePreview.locale(context),
+        builder: DevicePreview.appBuilder,
+        theme: darkMode,
+        routerConfig: router,
       ),
-      home: dbInit.when(
-        data: (_) => const _ReadyScreen(),
-        loading: () => const _SplashScreen(),
-        error: (err, stack) => _ErrorScreen(error: err),
+      loading: () => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: darkMode,
+        home: const _SplashScreen(),
+      ),
+      error: (err, stack) => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: darkMode,
+        home: _ErrorScreen(error: err),
       ),
     );
   }
@@ -73,64 +78,6 @@ class _SplashScreen extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Ready (temporary — replace with GoRouter shell) ─
-class _ReadyScreen extends ConsumerWidget {
-  const _ReadyScreen();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final counts = ref.watch(categoryCountsProvider);
-
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: counts.when(
-            data: (map) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Quotesy',
-                  style: TextStyle(
-                    fontFamily: 'Playfair Display',
-                    fontSize: 32,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${map.values.fold(0, (a, b) => a + b)} curated quotes loaded.',
-                  style: const TextStyle(color: Colors.white38, fontSize: 13),
-                ),
-                const SizedBox(height: 32),
-                ...QuoteCategory.all.map(
-                  (cat) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(cat,
-                            style: const TextStyle(
-                                color: Colors.white70, fontSize: 15)),
-                        Text('${map[cat] ?? 0}',
-                            style: const TextStyle(
-                                color: Colors.white38, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text('$e',
-                style: const TextStyle(color: Colors.redAccent)),
-          ),
         ),
       ),
     );

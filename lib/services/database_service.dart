@@ -10,9 +10,8 @@ import '../models/quote.dart';
 const _quotesBoxName = 'quotes_box';
 const _savedBoxName = 'saved_box';
 const _settingsBoxName = 'settings_box';
-const _importCompleteKey = 'import_v2_complete'; 
+const _importCompleteKey = 'import_v2_complete';
 const _categoryIndexKey = 'category_index';
-
 
 class QuoteCategory {
   static const existential = 'Existential';
@@ -23,12 +22,12 @@ class QuoteCategory {
   static const loveAndYearning = 'Love & Yearning';
 
   static const all = [
-    existential,
-    warAndEpic,
     psychologyAndSelf,
+    existential,
+    loveAndYearning,
     witAndWisdom,
     spiritualityAndFaith,
-    loveAndYearning,
+    warAndEpic,
   ];
 }
 
@@ -62,21 +61,30 @@ class DatabaseService {
   bool _isInitialized = false;
 
   Box<Quote> get _quotesBox {
-    assert(_isInitialized, 'DatabaseService.init() must be awaited before accessing boxes.');
+    assert(
+      _isInitialized,
+      'DatabaseService.init() must be awaited before accessing boxes.',
+    );
     return Hive.box<Quote>(_quotesBoxName);
   }
 
   Box<String> get _savedBox {
-    assert(_isInitialized, 'DatabaseService.init() must be awaited before accessing boxes.');
+    assert(
+      _isInitialized,
+      'DatabaseService.init() must be awaited before accessing boxes.',
+    );
     return Hive.box<String>(_savedBoxName);
   }
 
   Box get _settingsBox {
-    assert(_isInitialized, 'DatabaseService.init() must be awaited before accessing boxes.');
+    assert(
+      _isInitialized,
+      'DatabaseService.init() must be awaited before accessing boxes.',
+    );
     return Hive.box(_settingsBoxName);
   }
 
-  // ── 1. INITIALIZATION 
+  // ── 1. INITIALIZATION
   Future<void> init() async {
     if (_isInitialized) return;
 
@@ -95,15 +103,19 @@ class DatabaseService {
     _isInitialized = true;
   }
 
-  // ── 2. ZERO-JANK IMPORT 
+  // ── 2. ZERO-JANK IMPORT
   Future<void> ensureInitialImport() async {
-    final bool isImported = _settingsBox.get(_importCompleteKey, defaultValue: false);
+    final bool isImported = _settingsBox.get(
+      _importCompleteKey,
+      defaultValue: false,
+    );
     if (isImported) return;
 
     try {
-      final String jsonString = await rootBundle.loadString('assets/quotes.json');
+      final String jsonString = await rootBundle.loadString(
+        'assets/quotes.json',
+      );
 
-     
       final result = await compute(_parseQuotesInIsolate, jsonString);
 
       await _quotesBox.clear();
@@ -117,8 +129,10 @@ class DatabaseService {
 
       await _settingsBox.put(_importCompleteKey, true);
 
-      debugPrint('✅ Imported ${result.quoteMap.length} quotes across '
-          '${result.categoryIndex.keys.length} categories.');
+      debugPrint(
+        '✅ Imported ${result.quoteMap.length} quotes across '
+        '${result.categoryIndex.keys.length} categories.',
+      );
     } catch (e, stack) {
       debugPrint('❌ Import failed: $e\n$stack');
       rethrow;
@@ -178,7 +192,7 @@ class DatabaseService {
 
   /// Returns saved quotes newest-first. O(n) on vault size, not total library.
   List<Quote> getSavedQuotes() {
-    return  _savedBox.values
+    return _savedBox.values
         .map((id) => _quotesBox.get(id))
         .whereType<Quote>()
         .toList()
