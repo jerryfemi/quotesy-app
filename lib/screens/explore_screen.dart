@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:quotes/models/category_style.dart';
-import '../services/database_service.dart';
-import '../widgets/reactive_light_card.dart';
 
+import '../models/category_style.dart';
+import '../services/database_service.dart';
+import '../widgets/quotesy_nav_bar.dart';
+import '../widgets/reactive_light_card.dart';
+import '../theme/quotesy_theme.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ExploreScreen
+//
+// Vertical PageView of ReactiveLightCards.
+// Styles list built once in initState — not on every scroll frame.
+// Listener drives nav bar hide/show via raw pointer delta.
+// ─────────────────────────────────────────────────────────────────────────────
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
 
@@ -12,14 +22,15 @@ class ExploreScreen extends StatefulWidget {
 
 class _ExploreScreenState extends State<ExploreScreen> {
   late final PageController _pageController;
+  late final List<CategoryStyle> _styles;
   double _currentPage = 0.0;
 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(
-      viewportFraction: 0.76, // Shorter cards so next one clearly peeks in view
-    );
+    // Built once. CategoryStyle.forCategory is pure — safe to cache here.
+    _styles = QuoteCategory.all.map(CategoryStyle.forCategory).toList();
+    _pageController = PageController(viewportFraction: 0.76);
     _pageController.addListener(_onScroll);
   }
 
@@ -39,69 +50,36 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final nav = NavBarControllerScope.of(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF050505),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(),
-            const SizedBox(height: 8),
-            Expanded(child: _buildCardList()),
-          ],
+      backgroundColor: QColors.obsidian,
+      appBar: AppBar(
+        title: Text(
+          'Explore',
+          style: Theme.of(context).textTheme.headlineMedium,
         ),
       ),
-    );
-  }
+      body: Listener(
+        onPointerMove: (e) => nav.onDrag(e.delta.dy),
+        onPointerUp: (_) => nav.onDragEnd(),
+        onPointerCancel: (_) => nav.onDragEnd(),
+        child: PageView.builder(
+          controller: _pageController,
+          scrollDirection: Axis.vertical,
+          padEnds: true,
+          itemCount: _styles.length,
+          itemBuilder: (context, index) {
+            final distance = (_currentPage - index).abs();
+            final focusAmount = (1.0 - (distance * 0.9)).clamp(0.0, 1.0);
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 24, 28, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'CURATED ANTHOLOGIES',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.3),
-              fontSize: 11,
-              letterSpacing: 3,
-              fontFamily: 'Inter',
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Quotesy',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 28,
-              fontFamily: 'Playfair Display',
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+            return ReactiveLightCard(
+              style: _styles[index],
+              focusAmount: focusAmount,
+            );
+          },
+        ),
       ),
-    );
-  }
-
-  Widget _buildCardList() {
-    // Build styles once, not on every scroll frame.
-    final styles = QuoteCategory.all.map(CategoryStyle.forCategory).toList();
-
-    return PageView.builder(
-      controller: _pageController,
-      scrollDirection: Axis.vertical,
-      padEnds: true,
-      itemCount: styles.length,
-      itemBuilder: (context, index) {
-        final distance = (_currentPage - index).abs();
-        final focusAmount = (1.0 - (distance * 1.2)).clamp(0.0, 1.0);
-
-        return ReactiveLightCard(
-          style: styles[index],
-          focusAmount: focusAmount,
-        );
-      },
     );
   }
 }

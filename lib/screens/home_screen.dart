@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../models/quote.dart';
 import '../providers/database_provider.dart';
-import '../routes/app_router.dart';
+import '../theme/quotesy_theme.dart';
+import '../widgets/quotesy_nav_bar.dart';
+
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -12,7 +16,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  final PageController _pageController = PageController();
+  final _pageController = PageController();
 
   @override
   void dispose() {
@@ -22,59 +26,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final feedAsync = ref.watch(randomFeedProvider);
-    final navBarController = NavBarControllerScope.of(context);
+   
+    final quotes = ref.watch(randomFeedProvider).maybeWhen(
+      data: (value) => value,
+      orElse: () => <Quote>[],
+    );
+    final nav = NavBarControllerScope.of(context);
 
-    return feedAsync.when(
-      loading: () => const _QuoteLoadingSkeleton(),
-      error: (e, _) => _QuoteError(error: e),
-      data: (quotes) => Listener(
-        onPointerMove: (event) {
-          navBarController.onDrag(event.delta.dy);
-        },
-        onPointerUp: (_) => navBarController.onDragEnd(),
-        onPointerCancel: (_) => navBarController.onDragEnd(),
-        child: PageView.builder(
-          controller: _pageController,
-          scrollDirection: Axis.vertical,
-          itemCount: quotes.length,
-          itemBuilder: (context, index) {
-            return _QuoteCard(quote: quotes[index]);
-          },
+    return Listener(
+      onPointerMove:  (e) => nav.onDrag(e.delta.dy),
+      onPointerUp:    (_) => nav.onDragEnd(),
+      onPointerCancel:(_) => nav.onDragEnd(),
+      child: PageView.builder(
+        controller: _pageController,
+        scrollDirection: Axis.vertical,
+        itemCount: quotes.length,
+        itemBuilder: (context, index) => _QuoteCard(
+          key: ValueKey(quotes[index].id),
+          quote: quotes[index],
         ),
       ),
     );
   }
 }
 
+
 class _QuoteCard extends ConsumerWidget {
   final Quote quote;
-
-  const _QuoteCard({required this.quote});
+  const _QuoteCard({super.key, required this.quote});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final isBookmarkedAsync = ref.watch(
-      savedQuotesProvider.select(
-        (state) =>
-            state.whenData((quotes) => quotes.any((q) => q.id == quote.id)),
-      ),
-    );
-    final isBookmarked = isBookmarkedAsync.maybeWhen(
-      data: (value) => value,
-      orElse: () => false,
+
+    final isBookmarked = ref.watch(
+      savedQuotesProvider.select((s) =>
+          s.whenData((list) => list.any((q) => q.id == quote.id))
+              .maybeWhen(data: (value) => value, orElse: () => false)),
     );
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
+    return ColoredBox(
+      color: QColors.obsidian,
+      child: Stack(
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(
                   '"${quote.text}"',
@@ -82,33 +80,32 @@ class _QuoteCard extends ConsumerWidget {
                   style: theme.textTheme.displayMedium,
                 ),
                 const SizedBox(height: 28),
-                Container(
-                  width: 40,
-                  height: 1,
-                  color: Colors.white.withValues(alpha: 0.15),
-                ),
+                const _Divider(),
                 const SizedBox(height: 20),
                 Text(
                   quote.author.toUpperCase(),
                   textAlign: TextAlign.center,
                   style: theme.textTheme.labelLarge,
                 ),
-                if (quote.sourceSection != null &&
-                    quote.sourceSection!.isNotEmpty) ...[
+                if (quote.sourceSection?.isNotEmpty == true) ...[
                   const SizedBox(height: 6),
                   Text(
                     quote.sourceSection!,
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontStyle: FontStyle.italic,
-                      color: Colors.white38,
+                      color: QColors.textSubtle,
                       fontSize: 13,
                     ),
                   ),
                 ],
               ],
             ),
-          ),
+          )
+          .animate()
+          .fadeIn(duration: 400.ms, curve: Curves.easeOut)
+          .slideY(begin: 0.04, end: 0, duration: 400.ms, curve: Curves.easeOut),
+
           Positioned(
             top: MediaQuery.of(context).padding.top + 12,
             right: 20,
@@ -119,17 +116,34 @@ class _QuoteCard extends ConsumerWidget {
                       ? Icons.bookmark_rounded
                       : Icons.bookmark_outline_rounded,
                   isActive: isBookmarked,
-                  onTap: () {
-                    ref.read(savedQuotesProvider.notifier).toggle(quote.id);
-                  },
+                  onTap: () =>
+                      ref.read(savedQuotesProvider.notifier).toggle(quote.id),
                 ),
                 const SizedBox(width: 8),
-                _ActionButton(icon: Icons.ios_share_rounded, onTap: () {}),
+                _ActionButton(
+                  icon: Icons.ios_share_rounded,
+                  onTap: () {
+                    // TODO: share_plus
+                  },
+                ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  const _Divider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 1,
+      color: QColors.divider,
     );
   }
 }
@@ -151,47 +165,14 @@ class _ActionButton extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 200),
+        duration: 200.ms,
         child: Icon(
           icon,
           key: ValueKey(isActive),
-          color: isActive ? Colors.white : Colors.white54,
+          // Active bookmark → amber accent. Inactive → subtle white.
+          color: isActive ? QColors.amberGlow : QColors.textSubtle,
           size: 22,
         ),
-      ),
-    );
-  }
-}
-
-class _QuoteLoadingSkeleton extends StatelessWidget {
-  const _QuoteLoadingSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: SizedBox(
-        width: 20,
-        height: 20,
-        child: CircularProgressIndicator(
-          strokeWidth: 1.5,
-          color: Colors.white24,
-        ),
-      ),
-    );
-  }
-}
-
-class _QuoteError extends StatelessWidget {
-  final Object error;
-
-  const _QuoteError({required this.error});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        '$error',
-        style: const TextStyle(color: Colors.white24, fontSize: 13),
       ),
     );
   }

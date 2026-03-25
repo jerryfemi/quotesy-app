@@ -10,8 +10,8 @@ import '../models/quote.dart';
 const _quotesBoxName = 'quotes_box';
 const _savedBoxName = 'saved_box';
 const _settingsBoxName = 'settings_box';
-const _importCompleteKey = 'import_v2_complete';
-const _categoryIndexKey = 'category_index';
+const _importCompleteKey = 'import_v3_complete';
+const _categoryIndexKey = 'category_index_v3';
 
 class QuoteCategory {
   static const existential = 'Existential';
@@ -44,13 +44,28 @@ _ParseResult _parseQuotesInIsolate(String jsonString) {
   final List<dynamic> jsonData = json.decode(jsonString);
   final Map<String, Quote> quoteMap = {};
   final Map<String, List<String>> categoryIndex = {};
+  final Map<String, int> idOccurrences = {};
 
   for (final item in jsonData) {
-    final quote = Quote.fromJson(item as Map<String, dynamic>);
-    quoteMap[quote.id] = quote;
+    final parsedQuote = Quote.fromJson(item as Map<String, dynamic>);
+    final rawId = parsedQuote.id;
+    final occurrence = (idOccurrences[rawId] ?? 0) + 1;
+    idOccurrences[rawId] = occurrence;
+
+    final storageId = occurrence == 1 ? rawId : '$rawId#$occurrence';
+    final quote = Quote(
+      id: storageId,
+      text: parsedQuote.text,
+      author: parsedQuote.author,
+      category: parsedQuote.category,
+      source: parsedQuote.source,
+      sourceSection: parsedQuote.sourceSection,
+    );
+
+    quoteMap[storageId] = quote;
 
     // Build the category → [ids] index in the same pass. Zero extra cost.
-    categoryIndex.putIfAbsent(quote.category, () => []).add(quote.id);
+    categoryIndex.putIfAbsent(quote.category, () => []).add(storageId);
   }
 
   return _ParseResult(quoteMap: quoteMap, categoryIndex: categoryIndex);
@@ -119,6 +134,7 @@ class DatabaseService {
       final result = await compute(_parseQuotesInIsolate, jsonString);
 
       await _quotesBox.clear();
+      await _savedBox.clear();
       await _quotesBox.putAll(result.quoteMap);
 
       // Persist the category index so getQuotesByCategory never scans again.

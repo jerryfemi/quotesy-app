@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import '../models/category_style.dart';
 
@@ -16,10 +18,16 @@ class ReactiveLightCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final glowOpacity = (0.18 + (0.82 * focusAmount)).clamp(0.0, 1.0);
+    final glowFocus = Curves.easeOutCubic.transform(
+      focusAmount.clamp(0.0, 1.0),
+    );
+    final glowOpacity = (0.28 + (0.72 * glowFocus)).clamp(0.0, 1.0);
+    final rimAlpha = (0.10 + (0.22 * glowFocus)).clamp(0.0, 1.0);
+    final focusGlowAlpha = (0.08 + (0.24 * glowFocus)).clamp(0.0, 1.0);
 
-    final subtitleOpacity = ((focusAmount - 0.6) / 0.4).clamp(0.0, 1.0);
-    final subtitleSlide = (1.0 - subtitleOpacity) * 16.0;
+    final subtitleOpacity = ((focusAmount - 0.35) / 0.65).clamp(0.0, 1.0);
+    final subtitleSlide =
+        Curves.easeOut.transform(1.0 - subtitleOpacity) * 12.0;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -27,11 +35,20 @@ class ReactiveLightCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         color: const Color(0xFF080604),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.05 + (0.12 * focusAmount)),
+          color: Colors.white.withValues(alpha: rimAlpha),
           width: 1.0,
         ),
-        boxShadow: const [
-          BoxShadow(color: Color(0x99000000), blurRadius: 24, spreadRadius: 4),
+        boxShadow: [
+          const BoxShadow(
+            color: Color(0x99000000),
+            blurRadius: 24,
+            spreadRadius: 4,
+          ),
+          BoxShadow(
+            color: style.primaryColor.withValues(alpha: focusGlowAlpha),
+            blurRadius: 40,
+            spreadRadius: 2,
+          ),
         ],
       ),
       child: ClipRRect(
@@ -39,7 +56,30 @@ class ReactiveLightCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            //lighting
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+              child: Container(
+                color: Colors.white.withValues(
+                  alpha: 0.015 + (0.02 * focusAmount),
+                ),
+              ),
+            ),
+
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF1A1A1A).withValues(alpha: 0.26),
+                    const Color(0xFF0A0A0A).withValues(alpha: 0.62),
+                  ],
+                ),
+              ),
+            ),
+
+            // lighting
             Opacity(
               opacity: glowOpacity,
               child: Stack(
@@ -67,7 +107,7 @@ class ReactiveLightCard extends StatelessWidget {
                   //tag
                   Text(
                     style.tagLine,
-                    style: theme.textTheme.labelLarge?.copyWith(
+                    style: theme.textTheme.labelSmall?.copyWith(
                       color: Colors.white.withValues(
                         alpha: 0.35 + (0.25 * focusAmount),
                       ),
@@ -80,11 +120,9 @@ class ReactiveLightCard extends StatelessWidget {
                   Text(
                     style.displayTitle,
                     style: theme.textTheme.headlineMedium?.copyWith(
-                      fontSize: 34,
                       color: Colors.white.withValues(
                         alpha: 0.7 + (0.3 * focusAmount),
                       ),
-                      height: 1.15,
                     ),
                   ),
 
