@@ -1,54 +1,88 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../models/category_style.dart';
+import '../theme/quotesy_theme.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ReactiveLightCard
+//
+// The lighting system works in 3 layers, bottom to top:
+//
+//   1. BASE CARD     — pure #080604, the darkroom floor
+//   2. LIGHT LAYERS  — the category gradients (the actual lighting)
+//   3. CONTENT       — tag, title, subtitle
+//
+// Nothing sits between the base and the light layers.
+// No dark overlays, no backdrop blur — those were killing the gradients.
+//
+// Unfocused cards: light layers at glowBaseline (25%) so the card
+// breathes with colour even when not centred. The user can see
+// "there's something there" without it competing with the focused card.
+//
+// Focused cards: light layers at 100%, outer boxShadow glows with
+// primaryColor, rim border brightens — full awakening.
+// ─────────────────────────────────────────────────────────────────────────────
 class ReactiveLightCard extends StatelessWidget {
   final CategoryStyle style;
-
-  /// 0.0 = off-screen. 1.0 = dead center.
-  final double focusAmount;
+  final double focusAmount;     // 0.0 = off-screen, 1.0 = dead center
+  final double glowBaseline;    // minimum light opacity on unfocused cards
 
   const ReactiveLightCard({
     super.key,
     required this.style,
     required this.focusAmount,
+    this.glowBaseline = 0.25,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // Apply easeOutCubic so the glow accelerates into focus — feels alive.
     final glowFocus = Curves.easeOutCubic.transform(
       focusAmount.clamp(0.0, 1.0),
     );
-    final glowOpacity = (0.28 + (0.72 * glowFocus)).clamp(0.0, 1.0);
-    final rimAlpha = (0.10 + (0.22 * glowFocus)).clamp(0.0, 1.0);
-    final focusGlowAlpha = (0.08 + (0.24 * glowFocus)).clamp(0.0, 1.0);
 
-    final subtitleOpacity = ((focusAmount - 0.35) / 0.65).clamp(0.0, 1.0);
-    final subtitleSlide =
-        Curves.easeOut.transform(1.0 - subtitleOpacity) * 12.0;
+    // Light opacity: starts at glowBaseline, reaches 1.0 at full focus.
+    final lightOpacity =
+        (glowBaseline + ((1.0 - glowBaseline) * glowFocus)).clamp(0.0, 1.0);
+
+    // Outer glow (boxShadow): 0 when unfocused, pulses with primaryColor at focus.
+    final outerGlowAlpha = (0.0 + (0.45 * glowFocus)).clamp(0.0, 1.0);
+
+    // Rim border: subtle when unfocused, brightens as card enters focus.
+    final rimAlpha = (0.06 + (0.24 * glowFocus)).clamp(0.0, 1.0);
+
+    // Subtitle: fades in once focus > 0.35.
+    final subtitleVisible = focusAmount > 0.35;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: const Color(0xFF080604),
+        // The darkroom floor — deliberately near-black, not pure black,
+        // so the gradient colours read against it with warmth.
+        color: QColors.cardBase,
         border: Border.all(
           color: Colors.white.withValues(alpha: rimAlpha),
           width: 1.0,
         ),
         boxShadow: [
+          // Depth shadow — always present
           const BoxShadow(
-            color: Color(0x99000000),
+            color: Color(0xAA000000),
             blurRadius: 24,
-            spreadRadius: 4,
-          ),
-          BoxShadow(
-            color: style.primaryColor.withValues(alpha: focusGlowAlpha),
-            blurRadius: 40,
             spreadRadius: 2,
           ),
+          // Coloured outer glow — appears as card focuses.
+          // Spreads the card's primaryColor outward, making the card look
+          // like it's emitting light. This is the "Stitch" effect.
+          if (outerGlowAlpha > 0.0)
+            BoxShadow(
+              color: style.primaryColor.withValues(alpha: outerGlowAlpha),
+              blurRadius: 60,
+              spreadRadius: -8,
+            ),
         ],
       ),
       child: ClipRRect(
@@ -56,90 +90,74 @@ class ReactiveLightCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-              child: Container(
-                color: Colors.white.withValues(
-                  alpha: 0.015 + (0.02 * focusAmount),
-                ),
-              ),
-            ),
 
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xFF1A1A1A).withValues(alpha: 0.26),
-                    const Color(0xFF0A0A0A).withValues(alpha: 0.62),
-                  ],
-                ),
-              ),
-            ),
-
-            // lighting
+            // ── LIGHT LAYERS ────────────────────────────────────────────────
+            // Single Opacity wraps all gradient layers.
+            // One compositing layer total — cheaper than N individual Opacitys.
+            // NO dark overlay above this. NO backdrop blur. Nothing between
+            // this and the base card colour except the card itself.
             Opacity(
-              opacity: glowOpacity,
+              opacity: lightOpacity,
               child: Stack(
                 fit: StackFit.expand,
                 children: style.lightLayers
-                    .map(
-                      (layer) => Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          gradient: layer.gradient,
-                        ),
-                      ),
-                    )
+                    .map((layer) => DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: layer.gradient,
+                          ),
+                        ))
                     .toList(),
               ),
             ),
 
-            // CONTENT
+            // ── CONTENT ─────────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.all(32.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  //tag
+
+                  // Tag — small tracked caps, brightens with focus
                   Text(
                     style.tagLine,
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: Colors.white.withValues(
-                        alpha: 0.35 + (0.25 * focusAmount),
+                        alpha: 0.30 + (0.35 * glowFocus),
                       ),
                     ),
                   ),
 
                   const SizedBox(height: 10),
 
-                  // Title
+                  // Title — Playfair, brightens with focus
                   Text(
                     style.displayTitle,
                     style: theme.textTheme.headlineMedium?.copyWith(
                       color: Colors.white.withValues(
-                        alpha: 0.7 + (0.3 * focusAmount),
+                        alpha: 0.55 + (0.45 * glowFocus),
                       ),
                     ),
                   ),
 
-                  // Subtitle
-                  if (subtitleOpacity > 0.0) ...[
+                  // Subtitle — flutter_animate fadeIn + slideY
+                  // Removed from tree entirely when not visible.
+                  if (subtitleVisible) ...[
                     const SizedBox(height: 14),
-                    Transform.translate(
-                      offset: Offset(0, subtitleSlide),
-                      child: Opacity(
-                        opacity: subtitleOpacity,
-                        child: Text(
-                          style.subtitle,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
+                    Text(
+                      style.subtitle,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontStyle: FontStyle.italic,
+                        color: QColors.textMuted,
                       ),
+                    )
+                    .animate()
+                    .fadeIn(duration: 300.ms, curve: Curves.easeOut)
+                    .slideY(
+                      begin: 0.2,
+                      end: 0,
+                      duration: 300.ms,
+                      curve: Curves.easeOut,
                     ),
                   ],
                 ],

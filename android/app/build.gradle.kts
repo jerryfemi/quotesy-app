@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.example.quotes"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "29.0.13599879"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -35,6 +35,10 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+
+            // Enable R8 minification and resource shrinking to reduce binary size.
+            isMinifyEnabled = true
+            isShrinkResources = true
         }
     }
 }
