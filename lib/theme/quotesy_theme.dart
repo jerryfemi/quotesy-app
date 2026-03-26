@@ -61,7 +61,7 @@ final ThemeData darkMode = () {
       // Large quote text
       displayLarge: TextStyle(
         fontFamily: 'Playfair Display',
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: FontWeight.bold,
         color: QColors.textPrimary,
       ),
@@ -79,7 +79,6 @@ final ThemeData darkMode = () {
         fontSize: 30,
         fontWeight: FontWeight.w600,
         color: QColors.textPrimary,
-        height: 1.15,
       ),
       // Author names — tracked caps
       labelLarge: TextStyle(

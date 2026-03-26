@@ -55,8 +55,7 @@ class _SavedScreenState extends ConsumerState<SavedScreen> {
         child: savedAsync.when(
           loading: () => const SizedBox.shrink(), // local-first, never shows
           error: (e, _) => Center(
-            child: Text('$e',
-                style: const TextStyle(color: QColors.textGhost)),
+            child: Text('$e', style: const TextStyle(color: QColors.textGhost)),
           ),
           data: (quotes) {
             final filtered = _filtered(quotes);
@@ -127,22 +126,6 @@ class _Header extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top bar
-          Row(
-            children: [
-              // Hamburger — future: drawer
-              Icon(Icons.menu_rounded,
-                  color: QColors.textSubtle, size: 22),
-              const Spacer(),
-              GestureDetector(
-                onTap: onSearch,
-                child: Icon(Icons.search_rounded,
-                    color: QColors.textSubtle, size: 22),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
 
           // Tag
           Text(
@@ -156,10 +139,7 @@ class _Header extends StatelessWidget {
           const SizedBox(height: 8),
 
           // Title
-          Text(
-            'The Vault',
-            style: Theme.of(context).textTheme.displayLarge,
-          ),
+          Text('Saved Quotes', style: Theme.of(context).textTheme.displayLarge),
 
           const SizedBox(height: 6),
 
@@ -195,56 +175,59 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return ColoredBox(
-      color: QColors.obsidian,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Row(
-          children: List.generate(_tabs.length, (i) {
-            final isActive = i == activeIndex;
-            return GestureDetector(
-              onTap: () => onTap(i),
-              behavior: HitTestBehavior.opaque,
-              child: AnimatedContainer(
-                duration: 200.ms,
-                curve: Curves.easeOut,
-                margin: const EdgeInsets.only(right: 24),
-                padding: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      // Active tab: amber underline. Inactive: transparent.
-                      color: isActive
-                          ? QColors.amberGlow
-                          : Colors.transparent,
-                      width: 1.5,
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return SizedBox.expand(
+      child: ColoredBox(
+        color: QColors.obsidian,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: List.generate(_tabs.length, (i) {
+              final isActive = i == activeIndex;
+              return GestureDetector(
+                onTap: () => onTap(i),
+                behavior: HitTestBehavior.opaque,
+                child: AnimatedContainer(
+                  duration: 200.ms,
+                  curve: Curves.easeOut,
+                  margin: const EdgeInsets.only(right: 24),
+                  padding: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        // Active tab: amber underline. Inactive: transparent.
+                        color: isActive
+                            ? QColors.amberGlow
+                            : Colors.transparent,
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                  child: Text(
+                    _tabs[i].label,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                      letterSpacing: 1.8,
+                      color: isActive ? Colors.white : QColors.textSubtle,
                     ),
                   ),
                 ),
-                child: Text(
-                  _tabs[i].label,
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 11,
-                    fontWeight:
-                        isActive ? FontWeight.w700 : FontWeight.w500,
-                    letterSpacing: 1.8,
-                    color: isActive ? Colors.white : QColors.textSubtle,
-                  ),
-                ),
-              ),
-            );
-          }),
+              );
+            }),
+          ),
         ),
       ),
     );
   }
 
   @override
-  bool shouldRebuild(_TabBarDelegate old) =>
-      old.activeIndex != activeIndex;
+  bool shouldRebuild(_TabBarDelegate old) => old.activeIndex != activeIndex;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -262,87 +245,94 @@ class _SavedQuoteCard extends ConsumerWidget {
 
     return GestureDetector(
       onTap: () => _openDetail(context, quote),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        decoration: BoxDecoration(
-          color: QColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: QColors.borderSubtle, width: 1),
-        ),
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 28, 48, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Quote text
-                  Text(
-                    '"${quote.text}"',
-                    style: theme.textTheme.displayMedium?.copyWith(
-                      fontSize: 18,
-                      height: 1.5,
+      child:
+          Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: QColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: QColors.borderSubtle, width: 1),
+                ),
+                child: Stack(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 28, 48, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Quote text
+                          Text(
+                            '"${quote.text}"',
+                            style: theme.textTheme.displayMedium?.copyWith(
+                              fontSize: 18,
+                              height: 1.5,
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Thin divider line — matches screenshot
+                          Container(
+                            width: 32,
+                            height: 1,
+                            color: QColors.divider,
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // Author
+                          Text(
+                            quote.author.toUpperCase(),
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontSize: 11,
+                              color: QColors.textSubtle,
+                            ),
+                          ),
+
+                          // Source section
+                          if (quote.sourceSection?.isNotEmpty == true) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              quote.sourceSection!,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
+                                color: QColors.textGhost,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 16),
-
-                  // Thin divider line — matches screenshot
-                  Container(
-                    width: 32,
-                    height: 1,
-                    color: QColors.divider,
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Author
-                  Text(
-                    quote.author.toUpperCase(),
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontSize: 11,
-                      color: QColors.textSubtle,
-                    ),
-                  ),
-
-                  // Source section
-                  if (quote.sourceSection?.isNotEmpty == true) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      quote.sourceSection!,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontSize: 12,
-                        fontStyle: FontStyle.italic,
-                        color: QColors.textGhost,
+                    // Bookmark icon — top right, tapping removes from vault
+                    Positioned(
+                      top: 16,
+                      right: 16,
+                      child: GestureDetector(
+                        onTap: () => ref
+                            .read(savedQuotesProvider.notifier)
+                            .toggle(quote.id),
+                        behavior: HitTestBehavior.opaque,
+                        child: const Icon(
+                          Icons.bookmark_rounded,
+                          color: QColors.amberGlow,
+                          size: 18,
+                        ),
                       ),
                     ),
                   ],
-                ],
-              ),
-            ),
-
-            // Bookmark icon — top right, tapping removes from vault
-            Positioned(
-              top: 16,
-              right: 16,
-              child: GestureDetector(
-                onTap: () =>
-                    ref.read(savedQuotesProvider.notifier).toggle(quote.id),
-                behavior: HitTestBehavior.opaque,
-                child: const Icon(
-                  Icons.bookmark_rounded,
-                  color: QColors.amberGlow,
-                  size: 18,
                 ),
+              )
+              // Staggered entrance — each card fades up with a small delay
+              .animate(delay: (index * 60).ms)
+              .fadeIn(duration: 350.ms, curve: Curves.easeOut)
+              .slideY(
+                begin: 0.06,
+                end: 0,
+                duration: 350.ms,
+                curve: Curves.easeOut,
               ),
-            ),
-          ],
-        ),
-      )
-      // Staggered entrance — each card fades up with a small delay
-      .animate(delay: (index * 60).ms)
-      .fadeIn(duration: 350.ms, curve: Curves.easeOut)
-      .slideY(begin: 0.06, end: 0, duration: 350.ms, curve: Curves.easeOut),
     );
   }
 
@@ -355,10 +345,7 @@ class _SavedQuoteCard extends ConsumerWidget {
         pageBuilder: (_, __, ___) => _QuoteDetailScreen(quote: quote),
         transitionsBuilder: (_, animation, __, child) {
           return FadeTransition(
-            opacity: CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOut,
-            ),
+            opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
             child: child,
           );
         },
@@ -393,13 +380,13 @@ class _QuoteDetailScreen extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    '"${quote.text}"',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.displayMedium,
-                  )
-                  .animate()
-                  .fadeIn(duration: 400.ms, curve: Curves.easeOut)
-                  .slideY(begin: 0.04, end: 0, duration: 400.ms),
+                        '"${quote.text}"',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.displayMedium,
+                      )
+                      .animate()
+                      .fadeIn(duration: 400.ms, curve: Curves.easeOut)
+                      .slideY(begin: 0.04, end: 0, duration: 400.ms),
 
                   const SizedBox(height: 28),
 
@@ -519,9 +506,7 @@ class _EmptyState extends StatelessWidget {
           ),
         ],
       ),
-    )
-    .animate()
-    .fadeIn(duration: 400.ms);
+    ).animate().fadeIn(duration: 400.ms);
   }
 }
 

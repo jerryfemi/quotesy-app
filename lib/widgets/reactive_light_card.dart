@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../models/category_style.dart';
 import '../theme/quotesy_theme.dart';
 
@@ -15,12 +14,12 @@ import '../theme/quotesy_theme.dart';
 // Nothing sits between the base and the light layers.
 // No dark overlays, no backdrop blur — those were killing the gradients.
 //
-// Unfocused cards: light layers at glowBaseline (25%) so the card
+// Unfocused cards: light layers at glowBaseline so the card
 // breathes with colour even when not centred. The user can see
 // "there's something there" without it competing with the focused card.
 //
-// Focused cards: light layers at 100%, outer boxShadow glows with
-// primaryColor, rim border brightens — full awakening.
+// Focused cards: light layers at 100%, rim border brightens.
+// No outside glow/shadow is rendered beyond the card bounds.
 // ─────────────────────────────────────────────────────────────────────────────
 class ReactiveLightCard extends StatelessWidget {
   final CategoryStyle style;
@@ -47,125 +46,146 @@ class ReactiveLightCard extends StatelessWidget {
     final lightOpacity =
         (glowBaseline + ((1.0 - glowBaseline) * glowFocus)).clamp(0.0, 1.0);
 
-    // Outer glow (boxShadow): 0 when unfocused, pulses with primaryColor at focus.
-    final outerGlowAlpha = (0.0 + (0.45 * glowFocus)).clamp(0.0, 1.0);
-
     // Rim border: subtle when unfocused, brightens as card enters focus.
     final rimAlpha = (0.06 + (0.24 * glowFocus)).clamp(0.0, 1.0);
 
-    // Subtitle: fades in once focus > 0.35.
-    final subtitleVisible = focusAmount > 0.35;
+    // Subtitle: smoothly appears once focus crosses the reveal threshold.
+    final subtitleVisibility = ((focusAmount - 0.35) / 0.25).clamp(0.0, 1.0);
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        // The darkroom floor — deliberately near-black, not pure black,
-        // so the gradient colours read against it with warmth.
-        color: QColors.cardBase,
-        border: Border.all(
-          color: Colors.white.withValues(alpha: rimAlpha),
-          width: 1.0,
-        ),
-        boxShadow: [
-          // Depth shadow — always present
-          const BoxShadow(
-            color: Color(0xAA000000),
-            blurRadius: 24,
-            spreadRadius: 2,
+    return RepaintBoundary(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          color: QColors.cardBase,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: rimAlpha),
+            width: 1.0,
           ),
-          // Coloured outer glow — appears as card focuses.
-          // Spreads the card's primaryColor outward, making the card look
-          // like it's emitting light. This is the "Stitch" effect.
-          if (outerGlowAlpha > 0.0)
-            BoxShadow(
-              color: style.primaryColor.withValues(alpha: outerGlowAlpha),
-              blurRadius: 60,
-              spreadRadius: -8,
-            ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-
-            // ── LIGHT LAYERS ────────────────────────────────────────────────
-            // Single Opacity wraps all gradient layers.
-            // One compositing layer total — cheaper than N individual Opacitys.
-            // NO dark overlay above this. NO backdrop blur. Nothing between
-            // this and the base card colour except the card itself.
-            Opacity(
-              opacity: lightOpacity,
-              child: Stack(
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Stack(
                 fit: StackFit.expand,
                 children: style.lightLayers
-                    .map((layer) => DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: layer.gradient,
+                    .map(
+                      (layer) => DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: _gradientWithOpacity(
+                            layer.gradient,
+                            lightOpacity,
                           ),
-                        ))
-                    .toList(),
-              ),
-            ),
-
-            // ── CONTENT ─────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-
-                  // Tag — small tracked caps, brightens with focus
-                  Text(
-                    style.tagLine,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: Colors.white.withValues(
-                        alpha: 0.30 + (0.35 * glowFocus),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  // Title — Playfair, brightens with focus
-                  Text(
-                    style.displayTitle,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      color: Colors.white.withValues(
-                        alpha: 0.55 + (0.45 * glowFocus),
-                      ),
-                    ),
-                  ),
-
-                  // Subtitle — flutter_animate fadeIn + slideY
-                  // Removed from tree entirely when not visible.
-                  if (subtitleVisible) ...[
-                    const SizedBox(height: 14),
-                    Text(
-                      style.subtitle,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontStyle: FontStyle.italic,
-                        color: QColors.textMuted,
+                        ),
                       ),
                     )
-                    .animate()
-                    .fadeIn(duration: 300.ms, curve: Curves.easeOut)
-                    .slideY(
-                      begin: 0.2,
-                      end: 0,
-                      duration: 300.ms,
+                    .toList(),
+              ),
+
+              // ── CONTENT ─────────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Tag — small tracked caps, brightens with focus
+                    Text(
+                      style.tagLine,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontFamily: 'Playfair Display',
+                        letterSpacing: 1.6,
+                        color: Colors.white.withValues(
+                          alpha: 0.30 + (0.35 * glowFocus),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Title — Playfair, brightens with focus
+                    Text(
+                      style.displayTitle,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        color: Colors.white.withValues(
+                          alpha: 0.55 + (0.45 * glowFocus),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+                    AnimatedSlide(
+                      offset: Offset(0, (1.0 - subtitleVisibility) * 0.2),
+                      duration: const Duration(milliseconds: 140),
                       curve: Curves.easeOut,
+                      child: AnimatedOpacity(
+                        opacity: subtitleVisibility,
+                        duration: const Duration(milliseconds: 140),
+                        curve: Curves.easeOut,
+                        child: Text(
+                          style.subtitle,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontStyle: FontStyle.italic,
+                            color: QColors.textMuted,
+                          ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ),
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Gradient _gradientWithOpacity(Gradient gradient, double opacity) {
+    final adjustedColors = gradient.colors
+        .map((color) => color.withValues(alpha: color.a * opacity))
+        .toList(growable: false);
+
+    if (gradient is RadialGradient) {
+      return RadialGradient(
+        center: gradient.center,
+        radius: gradient.radius,
+        colors: adjustedColors,
+        stops: gradient.stops,
+        focal: gradient.focal,
+        focalRadius: gradient.focalRadius,
+        tileMode: gradient.tileMode,
+        transform: gradient.transform,
+      );
+    }
+
+    if (gradient is LinearGradient) {
+      return LinearGradient(
+        begin: gradient.begin,
+        end: gradient.end,
+        colors: adjustedColors,
+        stops: gradient.stops,
+        tileMode: gradient.tileMode,
+        transform: gradient.transform,
+      );
+    }
+
+    if (gradient is SweepGradient) {
+      return SweepGradient(
+        center: gradient.center,
+        startAngle: gradient.startAngle,
+        endAngle: gradient.endAngle,
+        colors: adjustedColors,
+        stops: gradient.stops,
+        tileMode: gradient.tileMode,
+        transform: gradient.transform,
+      );
+    }
+
+    return gradient;
   }
 }
