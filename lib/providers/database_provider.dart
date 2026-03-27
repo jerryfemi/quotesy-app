@@ -96,11 +96,7 @@ class FeedPreferencesNotifier extends AsyncNotifier<FeedPreferencesState> {
       }
     });
 
-    final categories = current.selectedCategories.toSet();
-    categories.addAll(cleanedAuthors.keys);
-
     final next = current.copyWith(
-      selectedCategories: categories.toList()..sort(),
       selectedAuthors: cleanedAuthors,
     );
     state = AsyncData(next);
@@ -184,7 +180,7 @@ final topAuthorsByCategoryProvider =
     FutureProvider.family<List<String>, String>((ref, category) async {
       await ref.watch(databaseInitProvider.future);
       final service = ref.read(databaseServiceProvider);
-      return service.getTopAuthorsByCategory(category, maxAuthors: 5);
+      return service.getTopAuthorsByCategory(category, maxAuthors: 10);
     });
 
 /// All quotes — for search screens

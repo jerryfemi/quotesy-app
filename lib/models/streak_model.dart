@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../providers/database_provider.dart';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // StreakData — the data model stored in Hive
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,12 +21,11 @@ class StreakData {
     int? currentStreak,
     int? bestStreak,
     DateTime? lastOpenedDate,
-  }) =>
-      StreakData(
-        currentStreak: currentStreak ?? this.currentStreak,
-        bestStreak: bestStreak ?? this.bestStreak,
-        lastOpenedDate: lastOpenedDate ?? this.lastOpenedDate,
-      );
+  }) => StreakData(
+    currentStreak: currentStreak ?? this.currentStreak,
+    bestStreak: bestStreak ?? this.bestStreak,
+    lastOpenedDate: lastOpenedDate ?? this.lastOpenedDate,
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,18 +42,24 @@ class StreakData {
 // No HiveObject needed — just primitive values.
 // ─────────────────────────────────────────────────────────────────────────────
 class StreakNotifier extends Notifier<StreakData> {
-  static const _boxName        = 'settings_box';
-  static const _currentKey     = 'streak_current';
-  static const _bestKey        = 'streak_best';
-  static const _lastOpenedKey  = 'streak_last_opened';
+  static const _boxName = 'settings_box';
+  static const _currentKey = 'streak_current';
+  static const _bestKey = 'streak_best';
+  static const _lastOpenedKey = 'streak_last_opened';
 
   Box get _box => Hive.box(_boxName);
 
   @override
   StreakData build() {
-    final current    = _box.get(_currentKey,    defaultValue: 0) as int;
-    final best       = _box.get(_bestKey,       defaultValue: 0) as int;
-    final lastRaw    = _box.get(_lastOpenedKey) as String?;
+    final initState = ref.watch(databaseInitProvider);
+    if (initState.isLoading || initState.hasError) {
+      // Defer box access until DatabaseService has opened all Hive boxes.
+      return const StreakData();
+    }
+
+    final current = _box.get(_currentKey, defaultValue: 0) as int;
+    final best = _box.get(_bestKey, defaultValue: 0) as int;
+    final lastRaw = _box.get(_lastOpenedKey) as String?;
     final lastOpened = lastRaw != null ? DateTime.tryParse(lastRaw) : null;
 
     // Run the streak update on first build (i.e. on app open)
@@ -72,11 +79,9 @@ class StreakNotifier extends Notifier<StreakData> {
 
     if (lastOpened == null) {
       // First ever open
-      return _save(StreakData(
-        currentStreak: 1,
-        bestStreak: 1,
-        lastOpenedDate: today,
-      ));
+      return _save(
+        StreakData(currentStreak: 1, bestStreak: 1, lastOpenedDate: today),
+      );
     }
 
     final last = _dateOnly(lastOpened);
@@ -94,25 +99,29 @@ class StreakNotifier extends Notifier<StreakData> {
     if (diff == 1) {
       // Consecutive day — increment
       final newCurrent = current + 1;
-      final newBest    = newCurrent > best ? newCurrent : best;
-      return _save(StreakData(
-        currentStreak: newCurrent,
-        bestStreak: newBest,
-        lastOpenedDate: today,
-      ));
+      final newBest = newCurrent > best ? newCurrent : best;
+      return _save(
+        StreakData(
+          currentStreak: newCurrent,
+          bestStreak: newBest,
+          lastOpenedDate: today,
+        ),
+      );
     }
 
     // Streak broken — reset to 1
-    return _save(StreakData(
-      currentStreak: 1,
-      bestStreak: best, // best streak is never reduced
-      lastOpenedDate: today,
-    ));
+    return _save(
+      StreakData(
+        currentStreak: 1,
+        bestStreak: best, // best streak is never reduced
+        lastOpenedDate: today,
+      ),
+    );
   }
 
   StreakData _save(StreakData data) {
-    _box.put(_currentKey,    data.currentStreak);
-    _box.put(_bestKey,       data.bestStreak);
+    _box.put(_currentKey, data.currentStreak);
+    _box.put(_bestKey, data.bestStreak);
     _box.put(_lastOpenedKey, data.lastOpenedDate?.toIso8601String());
     return data;
   }

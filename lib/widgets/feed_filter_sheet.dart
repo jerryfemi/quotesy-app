@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -38,12 +36,25 @@ class FeedFilterSheet extends ConsumerStatefulWidget {
 
 class _FeedFilterSheetState extends ConsumerState<FeedFilterSheet> {
   static const double _collapsedSnap = 0.52;
-  static const double _expandedSnap = 0.97;
+  static const double _expandedSnap = 0.85;
 
   final Set<String> _expandedCategories = <String>{};
 
   @override
   Widget build(BuildContext context) {
+    final topAuthorsByCategory = <String, List<String>>{};
+    final loadingCategories = <String>{};
+    for (final category in QuoteCategory.all) {
+      final asyncAuthors = ref.watch(topAuthorsByCategoryProvider(category));
+      topAuthorsByCategory[category] = asyncAuthors.maybeWhen(
+        data: (value) => value,
+        orElse: () => const <String>[],
+      );
+      if (asyncAuthors.isLoading) {
+        loadingCategories.add(category);
+      }
+    }
+
     final prefsState = ref
         .watch(feedPreferencesProvider)
         .maybeWhen(
@@ -105,15 +116,13 @@ class _FeedFilterSheetState extends ConsumerState<FeedFilterSheet> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Select categories, or expand any category to pick authors',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: QColors.textSubtle,
-                      ),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                  child: Text(
+                    'Choose categories, then expand any category to refine by author.',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: QColors.textSubtle,
+                      height: 1.35,
                     ),
                   ),
                 ),
@@ -129,15 +138,11 @@ class _FeedFilterSheetState extends ConsumerState<FeedFilterSheet> {
                       );
                       final isExpanded = _expandedCategories.contains(category);
                       final count = categoryCounts[category] ?? 0;
-
-                      final topAuthorsAsync = ref.watch(
-                        topAuthorsByCategoryProvider(category),
+                      final topAuthors =
+                          topAuthorsByCategory[category] ?? const <String>[];
+                      final authorsLoading = loadingCategories.contains(
+                        category,
                       );
-                      final topAuthors = topAuthorsAsync.maybeWhen(
-                        data: (value) => value,
-                        orElse: () => const <String>[],
-                      );
-                      final authorsLoading = topAuthorsAsync.isLoading;
 
                       final selectedSubset =
                           prefsState.selectedAuthors[category];
@@ -175,7 +180,6 @@ class _FeedFilterSheetState extends ConsumerState<FeedFilterSheet> {
                                 onToggleCategory: () => _toggleCategory(
                                   prefsState,
                                   category,
-                                  topAuthors,
                                 ),
                                 onToggleExpanded: () {
                                   setState(() {
@@ -269,7 +273,6 @@ class _FeedFilterSheetState extends ConsumerState<FeedFilterSheet> {
   void _toggleCategory(
     FeedPreferencesState state,
     String category,
-    List<String> topAuthors,
   ) {
     final categories = state.selectedCategories.toSet();
     final selectedAuthors = Map<String, List<String>>.from(
@@ -279,12 +282,10 @@ class _FeedFilterSheetState extends ConsumerState<FeedFilterSheet> {
     if (categories.contains(category)) {
       categories.remove(category);
       selectedAuthors.remove(category);
-      setState(() => _expandedCategories.remove(category));
     } else {
       categories.add(category);
       // Compact mode: all authors selected is implied by missing map entry.
       selectedAuthors.remove(category);
-      setState(() => _expandedCategories.add(category));
     }
 
     ref

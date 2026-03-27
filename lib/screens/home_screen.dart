@@ -21,6 +21,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _pageController = PageController();
+  static const int _narrowFeedThreshold = 20;
   int _currentIndex = 0;
 
   @override
@@ -183,6 +184,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
         ),
+
+        if (feedPrefs.hasActiveFilters && quotes.length < _narrowFeedThreshold)
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 90,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    width: 1,
+                  ),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.fromLTRB(14, 10, 14, 11),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.filter_alt_outlined,
+                        size: 14,
+                        color: QColors.textSubtle,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Your feed is short. Add a category or author to broaden it.',
+                          style: TextStyle(
+                            color: QColors.textSubtle,
+                            fontSize: 12,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

@@ -26,6 +26,7 @@ class ExploreScreen extends StatefulWidget {
 
 class _ExploreScreenState extends State<ExploreScreen> {
   late final PageController _pageController;
+  late final ValueNotifier<double> _pageOffset;
   late final List<CategoryStyle> _styles;
 
   static const double _glowBaseline = 0.05;
@@ -36,11 +37,21 @@ class _ExploreScreenState extends State<ExploreScreen> {
     super.initState();
     _styles = QuoteCategory.all.map(CategoryStyle.forCategory).toList();
     _pageController = PageController(viewportFraction: 0.72);
+    _pageOffset = ValueNotifier<double>(_pageController.initialPage.toDouble());
+    _pageController.addListener(_handlePageScroll);
+  }
+
+  void _handlePageScroll() {
+    if (!_pageController.hasClients) return;
+    _pageOffset.value =
+        _pageController.page ?? _pageController.initialPage.toDouble();
   }
 
   @override
   void dispose() {
+    _pageController.removeListener(_handlePageScroll);
     _pageController.dispose();
+    _pageOffset.dispose();
     super.dispose();
   }
 
@@ -77,19 +88,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Widget _buildPhonePager() {
-    return AnimatedBuilder(
-      animation: _pageController,
-      builder: (context, _) {
-        final currentPage = _pageController.hasClients
-            ? (_pageController.page ?? _pageController.initialPage.toDouble())
-            : _pageController.initialPage.toDouble();
-
-        return PageView.builder(
-          controller: _pageController,
-          scrollDirection: Axis.vertical,
-          padEnds: true,
-          itemCount: _styles.length,
-          itemBuilder: (context, index) {
+    return PageView.builder(
+      controller: _pageController,
+      scrollDirection: Axis.vertical,
+      padEnds: true,
+      itemCount: _styles.length,
+      itemBuilder: (context, index) {
+        return ValueListenableBuilder<double>(
+          valueListenable: _pageOffset,
+          builder: (context, currentPage, _) {
             final distance = (currentPage - index).abs();
             final focusAmount = (1.0 - (distance * _focusFalloff)).clamp(
               0.0,

@@ -29,6 +29,7 @@ class _HomeQuoteCardState extends ConsumerState<HomeQuoteCard> {
   Offset? _pointerDownPosition;
   bool _movedBeyondTolerance = false;
   bool _showBookmarkPulse = false;
+  bool _lastBookmarkActionSaved = true;
 
   void _onPointerDown(PointerDownEvent event) {
     _pointerDownPosition = event.position;
@@ -53,10 +54,15 @@ class _HomeQuoteCardState extends ConsumerState<HomeQuoteCard> {
   }
 
   Future<void> _onDoubleTap() async {
-    await ref.read(savedQuotesProvider.notifier).toggle(widget.quote.id);
+    final notifier = ref.read(savedQuotesProvider.notifier);
+    await notifier.toggle(widget.quote.id);
+    final nowSaved = notifier.isBookmarked(widget.quote.id);
     if (!mounted) return;
 
-    setState(() => _showBookmarkPulse = true);
+    setState(() {
+      _lastBookmarkActionSaved = nowSaved;
+      _showBookmarkPulse = true;
+    });
     await Future<void>.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
     setState(() => _showBookmarkPulse = false);
@@ -143,10 +149,18 @@ class _HomeQuoteCardState extends ConsumerState<HomeQuoteCard> {
                     ),
                   ),
                   child: _showBookmarkPulse
-                      ? const Icon(
-                          Icons.bookmark_rounded,
-                          key: ValueKey('bookmark-flash'),
-                          color: QColors.amberGlow,
+                      ? Icon(
+                          _lastBookmarkActionSaved
+                              ? Icons.bookmark_rounded
+                              : Icons.bookmark_remove_outlined,
+                          key: ValueKey(
+                            _lastBookmarkActionSaved
+                                ? 'bookmark-saved-flash'
+                                : 'bookmark-removed-flash',
+                          ),
+                          color: _lastBookmarkActionSaved
+                              ? QColors.amberGlow
+                              : Colors.white70,
                           size: 56,
                         )
                       : const SizedBox.shrink(key: ValueKey('bookmark-hidden')),

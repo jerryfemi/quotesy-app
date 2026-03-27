@@ -292,7 +292,7 @@ class DatabaseService {
   List<String> getTopAuthorsByCategory(
     String category, {
     int minQuotes = 10,
-    int maxAuthors = 5,
+    int maxAuthors = 10,
   }) {
     if (maxAuthors <= 0) return const [];
 
@@ -336,11 +336,16 @@ class DatabaseService {
     final hasCategorySelections = selectedCategories.isNotEmpty;
     final hasAuthorSelections = selectedAuthors.isNotEmpty;
 
+    // Empty selection means "show all" (shuffled), not a single default category.
+    if (!hasCategorySelections && !hasAuthorSelections) {
+      return _quotesBox.values.toList()..shuffle();
+    }
+
     final effectiveCategories = hasCategorySelections
         ? selectedCategories
         : hasAuthorSelections
             ? selectedAuthors.keys.toList(growable: false)
-            : const <String>[QuoteCategory.existential];
+            : const <String>[];
 
     final signature = _buildFilterSignature(effectiveCategories, selectedAuthors);
     if (_cachedFilteredSignature == signature && _cachedFilteredFeed != null) {
@@ -382,17 +387,18 @@ class DatabaseService {
     Map<String, List<String>> selectedAuthors,
   ) {
     final sortedCategories = [...selectedCategories]..sort();
-    final sortedAuthorMap = <String, List<String>>{};
+    final parts = <Object>[...sortedCategories];
     final keys = selectedAuthors.keys.toList()..sort();
 
     for (final key in keys) {
       final authors = [...selectedAuthors[key] ?? const <String>[]]..sort();
       if (authors.isNotEmpty) {
-        sortedAuthorMap[key] = authors;
+        parts.add(key);
+        parts.addAll(authors);
       }
     }
 
-    return Object.hash(json.encode(sortedCategories), json.encode(sortedAuthorMap));
+    return Object.hashAll(parts);
   }
 
   // ── 6. THE VAULT (Bookmarks) ─────────────────

@@ -3,13 +3,15 @@ import 'package:go_router/go_router.dart';
 import '../screens/home_screen.dart';
 import '../screens/explore_screen.dart';
 import '../screens/saved_screen.dart';
+import '../screens/splash_screen.dart';
 import '../widgets/quotesy_nav_bar.dart';
 
 // Routes only. No widgets, no controllers, no scaffolds.
 final routerProvider = GoRouter(
-  initialLocation: '/home',
+  initialLocation: '/splash',
   routes: [
-    GoRoute(path: '/', redirect: (_, _) => '/home'),
+    GoRoute(path: '/', redirect: (_, _) => '/splash'),
+    GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
 
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) =>
