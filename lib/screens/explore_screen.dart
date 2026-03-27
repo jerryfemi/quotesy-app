@@ -43,8 +43,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   void _handlePageScroll() {
     if (!_pageController.hasClients) return;
-    _pageOffset.value =
-        _pageController.page ?? _pageController.initialPage.toDouble();
+    final page = _pageController.page ?? _pageController.initialPage.toDouble();
+    if ((page - _pageOffset.value).abs() > 0.005) {
+      _pageOffset.value = page;
+    }
   }
 
   @override

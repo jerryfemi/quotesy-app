@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:screenshot/screenshot.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../models/quote.dart';
 import '../models/streak_model.dart';
 import '../providers/database_provider.dart';
+import '../services/quote_share_service.dart';
 import '../theme/quotesy_theme.dart';
 import '../widgets/feed_filter_sheet.dart';
 import '../widgets/home_quote_card.dart';
@@ -23,6 +22,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _pageController = PageController();
   static const int _narrowFeedThreshold = 20;
   int _currentIndex = 0;
+  bool _feedResetQueued = false;
 
   @override
   void initState() {
@@ -55,52 +55,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _shareQuote(Quote quote) async {
-    final screenshotController = ScreenshotController();
+    await shareQuoteImage(context, quote);
+  }
 
-    try {
-      final fileName = 'quotesy_${quote.id}';
-      final imageBytes = await screenshotController.captureFromWidget(
-        InheritedTheme.captureAll(
-          context,
-          MediaQuery(
-            data: MediaQuery.of(context),
-            child: Directionality(
-              textDirection: Directionality.of(context),
-              child: SizedBox(
-                width: 1080,
-                height: 1920,
-                child: _ShareQuoteCard(quote: quote),
-              ),
-            ),
-          ),
-        ),
-        delay: const Duration(milliseconds: 40),
-        pixelRatio: 2,
-      );
-
-      final file = XFile.fromData(
-        imageBytes,
-        mimeType: 'image/png',
-        name: '$fileName.png',
-      );
-
-      await SharePlus.instance.share(
-        ShareParams(
-          text: '"${quote.text}" — ${quote.author}',
-          files: [file],
-          fileNameOverrides: ['$fileName.png'],
-        ),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not share quote right now.')),
-      );
+  bool _didFeedChange(List<Quote> previous, List<Quote> next) {
+    if (previous.length != next.length) return true;
+    for (var i = 0; i < previous.length; i++) {
+      if (previous[i].id != next[i].id) {
+        return true;
+      }
     }
+    return false;
+  }
+
+  void _queueResetToFirstQuote() {
+    if (_feedResetQueued) return;
+    _feedResetQueued = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _feedResetQueued = false;
+      if (!mounted) return;
+
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(0);
+      }
+
+      if (_currentIndex != 0) {
+        setState(() => _currentIndex = 0);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<List<Quote>>>(filteredFeedProvider, (previous, next) {
+      final previousQuotes = previous?.maybeWhen(
+        data: (value) => value,
+        orElse: () => null,
+      );
+      final nextQuotes = next.maybeWhen(
+        data: (value) => value,
+        orElse: () => null,
+      );
+
+      if (previousQuotes == null || nextQuotes == null) return;
+      if (_didFeedChange(previousQuotes, nextQuotes)) {
+        _queueResetToFirstQuote();
+      }
+    });
+
     final quotes = ref
         .watch(filteredFeedProvider)
         .maybeWhen(data: (value) => value, orElse: () => <Quote>[]);
@@ -112,11 +115,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final nav = NavBarControllerScope.of(context);
     final topPad = MediaQuery.of(context).padding.top;
 
-    if (_currentIndex >= quotes.length && quotes.isNotEmpty) {
-      _currentIndex = 0;
+    if (quotes.isNotEmpty && _currentIndex >= quotes.length) {
+      _queueResetToFirstQuote();
     }
 
-    final currentQuote = quotes.isNotEmpty ? quotes[_currentIndex] : null;
+    final safeIndex = quotes.isEmpty
+        ? 0
+        : _currentIndex.clamp(0, quotes.length - 1) ;
+    final currentQuote = quotes.isNotEmpty ? quotes[safeIndex] : null;
 
     return Stack(
       children: [
@@ -231,53 +237,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-class _ShareQuoteCard extends StatelessWidget {
-  final Quote quote;
-  const _ShareQuoteCard({required this.quote});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Material(
-      color: QColors.obsidian,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '"${quote.text}"',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.displayMedium,
-            ),
-            const SizedBox(height: 28),
-            const _Divider(),
-            const SizedBox(height: 20),
-            Text(
-              quote.author.toUpperCase(),
-              textAlign: TextAlign.center,
-              style: theme.textTheme.labelLarge,
-            ),
-            if (quote.sourceSection?.isNotEmpty == true) ...[
-              const SizedBox(height: 6),
-              Text(
-                quote.sourceSection!,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontStyle: FontStyle.italic,
-                  color: QColors.textSubtle,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _StreakIndicator extends ConsumerWidget {
   const _StreakIndicator();
 
@@ -319,14 +278,5 @@ class _StreakIndicator extends ConsumerWidget {
         ),
       ],
     );
-  }
-}
-
-class _Divider extends StatelessWidget {
-  const _Divider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(width: 40, height: 1, color: QColors.divider);
   }
 }

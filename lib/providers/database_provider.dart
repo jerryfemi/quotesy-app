@@ -169,18 +169,23 @@ final feedPreferencesProvider =
 /// Filtered feed for Home. Uses persisted feed preferences.
 final filteredFeedProvider = FutureProvider<List<Quote>>((ref) async {
   await ref.watch(databaseInitProvider.future);
-  // Watching this makes the feed reactively rebuild when preferences change.
-  ref.watch(feedPreferencesProvider);
+  final prefs = ref.watch(feedPreferencesProvider).maybeWhen(
+    data: (value) => value,
+    orElse: () => FeedPreferencesState.empty,
+  );
 
   final service = ref.read(databaseServiceProvider);
-  return service.getFilteredFeed();
+  return service.getFilteredFeed(
+    selectedCategories: prefs.selectedCategories,
+    selectedAuthors: prefs.selectedAuthors,
+  );
 });
 
 final topAuthorsByCategoryProvider =
     FutureProvider.family<List<String>, String>((ref, category) async {
       await ref.watch(databaseInitProvider.future);
       final service = ref.read(databaseServiceProvider);
-      return service.getTopAuthorsByCategory(category, maxAuthors: 10);
+      return service.getTopAuthorsByCategory(category);
     });
 
 /// All quotes — for search screens

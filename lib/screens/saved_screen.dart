@@ -1,14 +1,11 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
-import 'package:screenshot/screenshot.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../models/quote.dart';
 import '../providers/database_provider.dart';
 import '../services/database_service.dart';
+import '../services/quote_share_service.dart';
 import '../theme/quotesy_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -355,115 +352,6 @@ class _SavedQuoteCard extends ConsumerWidget {
 // Full-screen quote view — same layout as HomeScreen quote card.
 // Tap anywhere or swipe down to dismiss.
 // ─────────────────────────────────────────────────────────────────────────────
-Future<void> _shareQuote(BuildContext context, Quote quote) async {
-  final screenshotController = ScreenshotController();
-
-  try {
-    final fileName = 'quotesy_${quote.id}';
-
-    final imageBytes = await screenshotController.captureFromWidget(
-      InheritedTheme.captureAll(
-        context,
-        MediaQuery(
-          data: MediaQuery.of(context),
-          child: Directionality(
-            textDirection: Directionality.of(context),
-            child: SizedBox(
-              width: 1080,
-              height: 1920,
-              child: _ShareQuoteCard(quote: quote),
-            ),
-          ),
-        ),
-      ),
-      delay: const Duration(milliseconds: 40),
-      pixelRatio: 2,
-    );
-
-    if (!kIsWeb) {
-      await ImageGallerySaverPlus.saveImage(
-        imageBytes,
-        quality: 100,
-        name: fileName,
-      );
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Saved to gallery')));
-      }
-    }
-
-    final file = XFile.fromData(
-      imageBytes,
-      mimeType: 'image/png',
-      name: '$fileName.png',
-    );
-
-    await SharePlus.instance.share(
-      ShareParams(
-        text: ' ${quote.author}',
-        files: [file],
-        fileNameOverrides: ['$fileName.png'],
-      ),
-    );
-  } catch (_) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not share quote right now.')),
-      );
-    }
-  }
-}
-
-class _ShareQuoteCard extends StatelessWidget {
-  final Quote quote;
-
-  const _ShareQuoteCard({required this.quote});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return ColoredBox(
-      color: QColors.obsidian,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '"${quote.text}"',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.displayMedium,
-            ),
-            const SizedBox(height: 28),
-            Container(width: 40, height: 1, color: QColors.divider),
-            const SizedBox(height: 20),
-            Text(
-              quote.author.toUpperCase(),
-              textAlign: TextAlign.center,
-              style: theme.textTheme.labelLarge,
-            ),
-            if (quote.sourceSection?.isNotEmpty == true) ...[
-              const SizedBox(height: 6),
-              Text(
-                quote.sourceSection!,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontStyle: FontStyle.italic,
-                  color: QColors.textSubtle,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _QuoteDetailScreen extends ConsumerWidget {
   final Quote quote;
   const _QuoteDetailScreen({required this.quote});
@@ -541,7 +429,7 @@ class _QuoteDetailScreen extends ConsumerWidget {
                   ),
                   const SizedBox(width: 12),
                   GestureDetector(
-                    onTap: () => _shareQuote(context, quote),
+                    onTap: () => shareQuoteImage(context, quote),
                     behavior: HitTestBehavior.opaque,
                     child: const Icon(
                       Icons.ios_share_rounded,
