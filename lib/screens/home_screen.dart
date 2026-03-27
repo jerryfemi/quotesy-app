@@ -32,7 +32,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final quotes = ref
-        .watch(randomFeedProvider)
+      .watch(filteredFeedProvider)
         .maybeWhen(data: (value) => value, orElse: () => <Quote>[]);
     final nav = NavBarControllerScope.of(context);
     final topPad = MediaQuery.of(context).padding.top;

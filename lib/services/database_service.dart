@@ -10,8 +10,11 @@ import '../models/quote.dart';
 const _quotesBoxName = 'quotes_box';
 const _savedBoxName = 'saved_box';
 const _settingsBoxName = 'settings_box';
+const _preferencesBoxName = 'preferences_box';
 const _importCompleteKey = 'import_v3_complete';
 const _categoryIndexKey = 'category_index_v3';
+const _selectedCategoriesKey = 'selected_categories_v1';
+const _selectedAuthorsKey = 'selected_authors_v1';
 
 class QuoteCategory {
   static const existential = 'Existential';
@@ -74,6 +77,8 @@ _ParseResult _parseQuotesInIsolate(String jsonString) {
 // DatabaseService
 class DatabaseService {
   bool _isInitialized = false;
+  int? _cachedFilteredSignature;
+  List<Quote>? _cachedFilteredFeed;
 
   Box<Quote> get _quotesBox {
     assert(
@@ -99,6 +104,14 @@ class DatabaseService {
     return Hive.box(_settingsBoxName);
   }
 
+  Box get _preferencesBox {
+    assert(
+      _isInitialized,
+      'DatabaseService.init() must be awaited before accessing boxes.',
+    );
+    return Hive.box(_preferencesBoxName);
+  }
+
   // ── 1. INITIALIZATION
   Future<void> init() async {
     if (_isInitialized) return;
@@ -113,6 +126,7 @@ class DatabaseService {
       Hive.openBox<Quote>(_quotesBoxName),
       Hive.openBox<String>(_savedBoxName),
       Hive.openBox(_settingsBoxName),
+      Hive.openBox(_preferencesBoxName),
     ]);
 
     _isInitialized = true;
@@ -194,7 +208,165 @@ class DatabaseService {
     return index.map((k, v) => MapEntry(k, v.length));
   }
 
-  // ── 5. THE VAULT (Bookmarks) ─────────────────
+  // ── 5. FEED PREFERENCES ─────────────────────
+
+  List<String> getSelectedCategories() {
+    final raw = _preferencesBox.get(_selectedCategoriesKey);
+    if (raw is List) {
+      return raw
+          .whereType<String>()
+          .map((category) => category.trim())
+          .where((category) => category.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+    }
+    return const [];
+  }
+
+  Map<String, List<String>> getSelectedAuthors() {
+    final raw = _preferencesBox.get(_selectedAuthorsKey) as String?;
+    if (raw == null || raw.isEmpty) return const {};
+
+    final decoded = json.decode(raw) as Map<String, dynamic>;
+    final mapped = decoded.map(
+      (category, authors) => MapEntry(
+        category,
+        List<String>.from(authors as List)
+            .map((author) => author.trim())
+            .where((author) => author.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort(),
+      ),
+    );
+
+    mapped.removeWhere((_, authors) => authors.isEmpty);
+    return mapped;
+  }
+
+  Future<void> setSelectedCategories(List<String> categories) async {
+    final normalized = categories
+        .map((category) => category.trim())
+        .where((category) => category.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+
+    await _preferencesBox.put(_selectedCategoriesKey, normalized);
+    _invalidateFilteredFeedCache();
+  }
+
+  Future<void> setSelectedAuthors(Map<String, List<String>> selectedAuthors) async {
+    final normalized = <String, List<String>>{};
+
+    selectedAuthors.forEach((category, authors) {
+      final cleaned = authors
+          .map((author) => author.trim())
+          .where((author) => author.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+
+      if (cleaned.isNotEmpty) {
+        normalized[category] = cleaned;
+      }
+    });
+
+    final encoded = json.encode(normalized);
+    await _preferencesBox.put(_selectedAuthorsKey, encoded);
+    _invalidateFilteredFeedCache();
+  }
+
+  List<String> getTopAuthorsByCategory(String category, {int minQuotes = 10}) {
+    final index = _getCategoryIndex();
+    final ids = index[category] ?? const <String>[];
+    final counts = <String, int>{};
+
+    for (final id in ids) {
+      final quote = _quotesBox.get(id);
+      if (quote == null) continue;
+      counts.update(quote.author, (count) => count + 1, ifAbsent: () => 1);
+    }
+
+    final filtered = counts.entries
+        .where((entry) => entry.value >= minQuotes)
+        .toList()
+      ..sort((a, b) {
+        final byCount = b.value.compareTo(a.value);
+        if (byCount != 0) return byCount;
+        return a.key.compareTo(b.key);
+      });
+
+    return filtered.map((entry) => entry.key).toList(growable: false);
+  }
+
+  List<Quote> getFilteredFeed() {
+    final selectedCategories = getSelectedCategories();
+    final selectedAuthors = getSelectedAuthors();
+    final hasCategorySelections = selectedCategories.isNotEmpty;
+    final hasAuthorSelections = selectedAuthors.isNotEmpty;
+
+    final effectiveCategories = hasCategorySelections
+        ? selectedCategories
+        : hasAuthorSelections
+            ? selectedAuthors.keys.toList(growable: false)
+            : const <String>[QuoteCategory.existential];
+
+    final signature = _buildFilterSignature(effectiveCategories, selectedAuthors);
+    if (_cachedFilteredSignature == signature && _cachedFilteredFeed != null) {
+      return _cachedFilteredFeed!;
+    }
+
+    final categoryIndex = _getCategoryIndex();
+
+    final filtered = <Quote>[];
+    for (final category in effectiveCategories) {
+      final ids = categoryIndex[category] ?? const <String>[];
+      final authorSubset = selectedAuthors[category];
+
+      for (final id in ids) {
+        final quote = _quotesBox.get(id);
+        if (quote == null) continue;
+
+        if (authorSubset != null && authorSubset.isNotEmpty) {
+          if (!authorSubset.contains(quote.author)) continue;
+        }
+
+        filtered.add(quote);
+      }
+    }
+
+    filtered.shuffle();
+    _cachedFilteredSignature = signature;
+    _cachedFilteredFeed = filtered;
+    return filtered;
+  }
+
+  void _invalidateFilteredFeedCache() {
+    _cachedFilteredSignature = null;
+    _cachedFilteredFeed = null;
+  }
+
+  int _buildFilterSignature(
+    List<String> selectedCategories,
+    Map<String, List<String>> selectedAuthors,
+  ) {
+    final sortedCategories = [...selectedCategories]..sort();
+    final sortedAuthorMap = <String, List<String>>{};
+    final keys = selectedAuthors.keys.toList()..sort();
+
+    for (final key in keys) {
+      final authors = [...selectedAuthors[key] ?? const <String>[]]..sort();
+      if (authors.isNotEmpty) {
+        sortedAuthorMap[key] = authors;
+      }
+    }
+
+    return Object.hash(json.encode(sortedCategories), json.encode(sortedAuthorMap));
+  }
+
+  // ── 6. THE VAULT (Bookmarks) ─────────────────
 
   bool isBookmarked(String quoteId) => _savedBox.containsKey(quoteId);
 

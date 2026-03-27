@@ -12,6 +12,10 @@ import '../theme/quotesy_theme.dart';
 // Vertical PageView of ReactiveLightCards.
 // Styles list built once in initState — not on every scroll frame.
 // Listener drives nav bar hide/show via raw pointer delta.
+//
+// Adaptive layout:
+//   - Phone: vertical hero PageView (focused card dynamics)
+//   - Tablet/Desktop: gallery grid for faster browsing
 // ─────────────────────────────────────────────────────────────────────────────
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -23,13 +27,15 @@ class ExploreScreen extends StatefulWidget {
 class _ExploreScreenState extends State<ExploreScreen> {
   late final PageController _pageController;
   late final List<CategoryStyle> _styles;
-  final double _glowBaseline = 0.05;
-  final double _focusFalloff = 1.20;
+  // Pinned categories: set of indices the user has toggled on for Home screen.
+  final Set<int> _pinnedIndices = {};
+
+  static const double _glowBaseline = 0.05;
+  static const double _focusFalloff = 1.20;
 
   @override
   void initState() {
     super.initState();
-    // Built once. CategoryStyle.forCategory is pure — safe to cache here.
     _styles = QuoteCategory.all.map(CategoryStyle.forCategory).toList();
     _pageController = PageController(viewportFraction: 0.72);
   }
@@ -38,6 +44,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _togglePin(int index) {
+    setState(() {
+      if (_pinnedIndices.contains(index)) {
+        _pinnedIndices.remove(index);
+      } else {
+        _pinnedIndices.add(index);
+      }
+    });
   }
 
   @override
@@ -56,39 +72,78 @@ class _ExploreScreenState extends State<ExploreScreen> {
         onPointerMove: (e) => nav.onDrag(e.delta.dy),
         onPointerUp: (_) => nav.onDragEnd(),
         onPointerCancel: (_) => nav.onDragEnd(),
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 72),
-          child: AnimatedBuilder(
-            animation: _pageController,
-            builder: (context, child) {
-              final currentPage = _pageController.hasClients
-                  ? (_pageController.page ??
-                        _pageController.initialPage.toDouble())
-                  : _pageController.initialPage.toDouble();
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 900;
 
-              return PageView.builder(
-                controller: _pageController,
-                scrollDirection: Axis.vertical,
-                padEnds: true,
-                itemCount: _styles.length,
-                itemBuilder: (context, index) {
-                  final distance = (currentPage - index).abs();
-                  final focusAmount = (1.0 - (distance * _focusFalloff)).clamp(
-                    0.0,
-                    1.0,
-                  );
-
-                  return ReactiveLightCard(
-                    style: _styles[index],
-                    focusAmount: focusAmount,
-                    glowBaseline: _glowBaseline,
-                  );
-                },
-              );
-            },
-          ),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 72),
+              child: isWide
+                  ? _buildWideGrid(constraints.maxWidth)
+                  : _buildPhonePager(),
+            );
+          },
         ),
       ),
+    );
+  }
+
+  Widget _buildPhonePager() {
+    return AnimatedBuilder(
+      animation: _pageController,
+      builder: (context, _) {
+        final currentPage = _pageController.hasClients
+            ? (_pageController.page ?? _pageController.initialPage.toDouble())
+            : _pageController.initialPage.toDouble();
+
+        return PageView.builder(
+          controller: _pageController,
+          scrollDirection: Axis.vertical,
+          padEnds: true,
+          itemCount: _styles.length,
+          itemBuilder: (context, index) {
+            final distance = (currentPage - index).abs();
+            final focusAmount = (1.0 - (distance * _focusFalloff)).clamp(
+              0.0,
+              1.0,
+            );
+
+            return ReactiveLightCard(
+              style: _styles[index],
+              focusAmount: focusAmount,
+              glowBaseline: _glowBaseline,
+              isPinned: _pinnedIndices.contains(index),
+              onPinToggle: () => _togglePin(index),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildWideGrid(double width) {
+    final crossAxisCount = width >= 1320 ? 3 : 2;
+    final childAspectRatio = width >= 1320 ? 0.78 : 0.74;
+
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(24, 14, 24, 18),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: 18,
+        mainAxisSpacing: 18,
+        childAspectRatio: childAspectRatio,
+      ),
+      itemCount: _styles.length,
+      itemBuilder: (context, index) {
+        return ReactiveLightCard(
+          style: _styles[index],
+          focusAmount: 1.0,
+          glowBaseline: _glowBaseline,
+          isPinned: _pinnedIndices.contains(index),
+          onPinToggle: () => _togglePin(index),
+          margin: EdgeInsets.zero,
+        );
+      },
     );
   }
 }

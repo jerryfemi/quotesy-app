@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 const _kAmber = Color(0xFFB8860B);
 const _kAmberGlow = Color(0xFFD4A017);
 
+// ─────────────────────────────────────────────────────────────────────────────
+// NavBarController
+//
+// ChangeNotifier that owns hide/show state.
+// Dead-zone accumulator prevents jitter from micro-scroll deltas.
+// ─────────────────────────────────────────────────────────────────────────────
 class NavBarController extends ChangeNotifier {
   bool _visible = true;
   double _accumulator = 0.0;
@@ -45,6 +52,12 @@ class NavBarController extends ChangeNotifier {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// NavBarControllerScope
+//
+// InheritedNotifier — any widget that calls .of(context) will automatically
+// rebuild when the controller notifies. No manual addListener needed.
+// ─────────────────────────────────────────────────────────────────────────────
 class NavBarControllerScope extends InheritedNotifier<NavBarController> {
   const NavBarControllerScope({
     super.key,
@@ -60,6 +73,16 @@ class NavBarControllerScope extends InheritedNotifier<NavBarController> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// QuotesyShell
+//
+// FIX: Removed the manual _rebuild listener + setState pattern.
+// Previously _QuotesyShellState was listening to NavBarController and calling
+// setState, which rebuilt the entire shell (including navigationShell) on
+// every hide/show event. Now QuotesyNavBar reads `visible` directly from the
+// scope via dependOnInheritedWidgetOfExactType, so only the nav bar subtree
+// rebuilds — not the whole shell.
+// ─────────────────────────────────────────────────────────────────────────────
 class QuotesyShell extends StatefulWidget {
   final StatefulNavigationShell navigationShell;
   const QuotesyShell({super.key, required this.navigationShell});
@@ -69,22 +92,12 @@ class QuotesyShell extends StatefulWidget {
 }
 
 class _QuotesyShellState extends State<QuotesyShell> {
-  late final NavBarController _navBarController;
-
-  @override
-  void initState() {
-    super.initState();
-    _navBarController = NavBarController();
-    _navBarController.addListener(_rebuild);
-  }
-
-  void _rebuild() {
-    if (mounted) setState(() {});
-  }
+  // Controller is created once and provided via scope.
+  // No manual listener needed — InheritedNotifier handles propagation.
+  final NavBarController _navBarController = NavBarController();
 
   @override
   void dispose() {
-    _navBarController.removeListener(_rebuild);
     _navBarController.dispose();
     super.dispose();
   }
@@ -92,8 +105,6 @@ class _QuotesyShellState extends State<QuotesyShell> {
   void _onTabTapped(int index) {
     widget.navigationShell.goBranch(
       index,
-      // Tapping the active tab again resets it to its initial route.
-      // Harmless now, useful once tabs have nested routes.
       initialLocation: index == widget.navigationShell.currentIndex,
     );
     _navBarController.show();
@@ -108,16 +119,16 @@ class _QuotesyShellState extends State<QuotesyShell> {
         extendBody: true,
         body: Stack(
           children: [
-            // Tab content — renders full-bleed behind the floating bar
             widget.navigationShell,
             Positioned(
               left: 0,
               right: 0,
               bottom: 0,
-              child: QuotesyNavBar(
+              // QuotesyNavBar now reads visible from the scope itself.
+              // No currentIndex/visible props need to flow through setState.
+              child: _NavBarConsumer(
                 currentIndex: widget.navigationShell.currentIndex,
                 onTap: _onTabTapped,
-                visible: _navBarController.visible,
               ),
             ),
           ],
@@ -127,10 +138,38 @@ class _QuotesyShellState extends State<QuotesyShell> {
   }
 }
 
-// ── 4. QuotesyNavBar ──────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// _NavBarConsumer
+//
+// Thin wrapper that reads `visible` from NavBarControllerScope and passes it
+// to QuotesyNavBar. Because it calls dependOnInheritedWidgetOfExactType,
+// only this subtree rebuilds when visibility changes — not QuotesyShell.
+// ─────────────────────────────────────────────────────────────────────────────
+class _NavBarConsumer extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+
+  const _NavBarConsumer({required this.currentIndex, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = NavBarControllerScope.of(context).visible;
+    return QuotesyNavBar(
+      currentIndex: currentIndex,
+      onTap: onTap,
+      visible: visible,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QuotesyNavBar
+//
 // Center: compact Home/Explore pill.
 // Right: detached circular Saved button.
-// AnimatedSlide drives the hide/show from NavBarController.visible.
+// AnimatedSlide with Offset(0, 2.0) — safe ceiling that fully clears any
+// device height, replacing the fragile 1.8 value.
+// ─────────────────────────────────────────────────────────────────────────────
 class QuotesyNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -150,7 +189,8 @@ class QuotesyNavBar extends StatelessWidget {
     final isSaved = currentIndex == 2;
 
     return AnimatedSlide(
-      offset: visible ? Offset.zero : const Offset(0, 1.8),
+      // 2.0 = guaranteed full hide on any device height, replacing fragile 1.8
+      offset: visible ? Offset.zero : const Offset(0, 2.0),
       duration: const Duration(milliseconds: 250),
       curve: visible ? Curves.easeOut : Curves.easeIn,
       child: SafeArea(
@@ -175,17 +215,17 @@ class QuotesyNavBar extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.07),
                         width: 1,
                       ),
-                      boxShadow: [
+                      boxShadow: const [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.55),
+                          color: Color(0x8C000000), // black @ 55%
                           blurRadius: 24,
-                          offset: const Offset(0, 8),
+                          offset: Offset(0, 8),
                         ),
                         BoxShadow(
-                          color: _kAmber.withValues(alpha: 0.08),
+                          color: Color(0x14B8860B), // amber @ 8%
                           blurRadius: 20,
                           spreadRadius: -4,
-                          offset: const Offset(0, 6),
+                          offset: Offset(0, 6),
                         ),
                       ],
                     ),
@@ -196,14 +236,20 @@ class QuotesyNavBar extends StatelessWidget {
                           icon: Icons.auto_awesome_outlined,
                           label: 'Home',
                           isActive: isHome,
-                          onTap: () => onTap(0),
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            onTap(0);
+                          },
                         ),
                         const SizedBox(width: 6),
                         _PillTabButton(
                           icon: Icons.explore_outlined,
                           label: 'Explore',
                           isActive: isExplore,
-                          onTap: () => onTap(1),
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            onTap(1);
+                          },
                         ),
                       ],
                     ),
@@ -213,37 +259,63 @@ class QuotesyNavBar extends StatelessWidget {
                 Align(
                   alignment: Alignment.bottomRight,
                   child: GestureDetector(
-                    onTap: () => onTap(2),
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      onTap(2);
+                    },
                     behavior: HitTestBehavior.opaque,
-                    child: AnimatedContainer(
+                    child: TweenAnimationBuilder<double>(
+                      // Animate the border/bg alpha so the glow actually
+                      // transitions — AnimatedContainer can't interpolate
+                      // BoxShadow, TweenAnimationBuilder can.
+                      tween: Tween(begin: 0.0, end: isSaved ? 1.0 : 0.0),
                       duration: const Duration(milliseconds: 200),
                       curve: Curves.easeOut,
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: isSaved
-                            ? _kAmber.withValues(alpha: 0.20)
-                            : const Color(0xFF111111),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isSaved
-                              ? _kAmber.withValues(alpha: 0.45)
-                              : Colors.white.withValues(alpha: 0.07),
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.55),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
+                      builder: (context, t, _) {
+                        return Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Color.lerp(
+                              const Color(0xFF111111),
+                              _kAmber.withValues(alpha: 0.20),
+                              t,
+                            ),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Color.lerp(
+                                Colors.white.withValues(alpha: 0.07),
+                                _kAmber.withValues(alpha: 0.45),
+                                t,
+                              )!,
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.55),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              ),
+                              // Amber glow only animates when saved
+                              if (t > 0)
+                                BoxShadow(
+                                  color: _kAmber.withValues(alpha: 0.15 * t),
+                                  blurRadius: 12,
+                                  spreadRadius: -2,
+                                ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: Icon(
-                        Icons.bookmark_outline_rounded,
-                        size: 20,
-                        color: isSaved ? _kAmberGlow : Colors.white38,
-                      ),
+                          child: Icon(
+                            Icons.bookmark_outline_rounded,
+                            size: 20,
+                            color: Color.lerp(
+                              Colors.white38,
+                              _kAmberGlow,
+                              t,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
