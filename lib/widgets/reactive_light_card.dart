@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../models/category_style.dart';
 import '../theme/quotesy_theme.dart';
 
@@ -11,8 +10,6 @@ import '../theme/quotesy_theme.dart';
 //   1. BASE CARD     — pure #080604, the darkroom floor
 //   2. LIGHT LAYERS  — the category gradients (the actual lighting)
 //   3. CONTENT       — tag, title, subtitle
-//   4. PIN TOGGLE    — top-right corner, overlaid above everything
-//
 // Nothing sits between the base and the light layers.
 // No dark overlays, no backdrop blur — those were killing the gradients.
 //
@@ -21,20 +18,12 @@ import '../theme/quotesy_theme.dart';
 //
 // Focused cards: light layers at 100%, rim border brightens.
 //
-// Pin toggle: always visible but subtle when unpinned. Amber + filled when
-// pinned. Tapping gives a light haptic. The toggle sits in the top-right
-// corner, 32×32 touch target so it never feels fiddly.
 // ─────────────────────────────────────────────────────────────────────────────
-
-const _kAmber = Color(0xFFB8860B);
-const _kAmberGlow = Color(0xFFD4A017);
 
 class ReactiveLightCard extends StatelessWidget {
   final CategoryStyle style;
   final double focusAmount; // 0.0 = off-screen, 1.0 = dead center
   final double glowBaseline; // minimum light opacity on unfocused cards
-  final bool isPinned; // whether this category is pinned to Home
-  final VoidCallback? onPinToggle;
   final EdgeInsetsGeometry margin;
 
   const ReactiveLightCard({
@@ -42,8 +31,6 @@ class ReactiveLightCard extends StatelessWidget {
     required this.style,
     required this.focusAmount,
     this.glowBaseline = 0.25,
-    this.isPinned = false,
-    this.onPinToggle,
     this.margin = const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
   });
 
@@ -153,16 +140,6 @@ class ReactiveLightCard extends StatelessWidget {
                   ],
                 ),
               ),
-
-              // ── PIN TOGGLE ───────────────────────────────────────────────
-              // Top-right corner. Small, unobtrusive, always visible.
-              // Outlined = not pinned. Filled amber = pinned to Home.
-              if (onPinToggle != null)
-                Positioned(
-                  top: 14,
-                  right: 14,
-                  child: _PinToggle(isPinned: isPinned, onTap: onPinToggle!),
-                ),
             ],
           ),
         ),
@@ -212,57 +189,5 @@ class ReactiveLightCard extends StatelessWidget {
     }
 
     return gradient;
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// _PinToggle
-//
-// A tiny 32×32 tap target in the top-right corner of the card.
-// Uses AnimatedSwitcher for a clean icon swap on state change.
-// Haptic feedback on every tap — makes it feel physical.
-//
-// Visual states:
-//   Unpinned  — push_pin_outlined, white at 35% opacity (quiet, present)
-//   Pinned    — push_pin,          amber glow (clear, confirmed)
-// ─────────────────────────────────────────────────────────────────────────────
-class _PinToggle extends StatelessWidget {
-  final bool isPinned;
-  final VoidCallback onTap;
-
-  const _PinToggle({required this.isPinned, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 32,
-        height: 32,
-        child: Center(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
-            transitionBuilder: (child, animation) => ScaleTransition(
-              scale: animation,
-              child: FadeTransition(opacity: animation, child: child),
-            ),
-            child: Icon(
-              isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-              key: ValueKey(isPinned),
-              size: 17,
-              color: isPinned
-                  ? _kAmberGlow
-                  : Colors.white.withValues(alpha: 0.35),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }

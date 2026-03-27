@@ -184,7 +184,7 @@ final topAuthorsByCategoryProvider =
     FutureProvider.family<List<String>, String>((ref, category) async {
       await ref.watch(databaseInitProvider.future);
       final service = ref.read(databaseServiceProvider);
-      return service.getTopAuthorsByCategory(category);
+      return service.getTopAuthorsByCategory(category, maxAuthors: 5);
     });
 
 /// All quotes — for search screens

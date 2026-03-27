@@ -15,6 +15,7 @@ const _importCompleteKey = 'import_v3_complete';
 const _categoryIndexKey = 'category_index_v3';
 const _selectedCategoriesKey = 'selected_categories_v1';
 const _selectedAuthorsKey = 'selected_authors_v1';
+const _homeGestureHintSeenKey = 'home_gesture_hint_seen_v1';
 
 class QuoteCategory {
   static const existential = 'Existential';
@@ -79,6 +80,7 @@ class DatabaseService {
   bool _isInitialized = false;
   int? _cachedFilteredSignature;
   List<Quote>? _cachedFilteredFeed;
+  final Map<String, List<String>> _topAuthorsCache = {};
 
   Box<Quote> get _quotesBox {
     assert(
@@ -278,7 +280,28 @@ class DatabaseService {
     _invalidateFilteredFeedCache();
   }
 
-  List<String> getTopAuthorsByCategory(String category, {int minQuotes = 10}) {
+  bool hasSeenHomeGestureHint() {
+    return _preferencesBox.get(_homeGestureHintSeenKey, defaultValue: false) ==
+        true;
+  }
+
+  Future<void> setHomeGestureHintSeen([bool seen = true]) async {
+    await _preferencesBox.put(_homeGestureHintSeenKey, seen);
+  }
+
+  List<String> getTopAuthorsByCategory(
+    String category, {
+    int minQuotes = 10,
+    int maxAuthors = 5,
+  }) {
+    if (maxAuthors <= 0) return const [];
+
+    final cacheKey = '$category|$minQuotes|$maxAuthors';
+    final cached = _topAuthorsCache[cacheKey];
+    if (cached != null) {
+      return cached;
+    }
+
     final index = _getCategoryIndex();
     final ids = index[category] ?? const <String>[];
     final counts = <String, int>{};
@@ -298,7 +321,13 @@ class DatabaseService {
         return a.key.compareTo(b.key);
       });
 
-    return filtered.map((entry) => entry.key).toList(growable: false);
+    final result = filtered
+      .take(maxAuthors)
+      .map((entry) => entry.key)
+      .toList(growable: false);
+
+    _topAuthorsCache[cacheKey] = result;
+    return result;
   }
 
   List<Quote> getFilteredFeed() {

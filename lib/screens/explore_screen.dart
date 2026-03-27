@@ -27,8 +27,6 @@ class ExploreScreen extends StatefulWidget {
 class _ExploreScreenState extends State<ExploreScreen> {
   late final PageController _pageController;
   late final List<CategoryStyle> _styles;
-  // Pinned categories: set of indices the user has toggled on for Home screen.
-  final Set<int> _pinnedIndices = {};
 
   static const double _glowBaseline = 0.05;
   static const double _focusFalloff = 1.20;
@@ -44,16 +42,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void dispose() {
     _pageController.dispose();
     super.dispose();
-  }
-
-  void _togglePin(int index) {
-    setState(() {
-      if (_pinnedIndices.contains(index)) {
-        _pinnedIndices.remove(index);
-      } else {
-        _pinnedIndices.add(index);
-      }
-    });
   }
 
   @override
@@ -112,8 +100,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
               style: _styles[index],
               focusAmount: focusAmount,
               glowBaseline: _glowBaseline,
-              isPinned: _pinnedIndices.contains(index),
-              onPinToggle: () => _togglePin(index),
             );
           },
         );
@@ -139,8 +125,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
           style: _styles[index],
           focusAmount: 1.0,
           glowBaseline: _glowBaseline,
-          isPinned: _pinnedIndices.contains(index),
-          onPinToggle: () => _togglePin(index),
           margin: EdgeInsets.zero,
         );
       },
