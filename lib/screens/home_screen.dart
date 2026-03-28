@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +25,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   static const int _narrowFeedThreshold = 20;
   int _currentIndex = 0;
   bool _feedResetQueued = false;
+  bool _showGhostHint = false;
+  double _ghostHintOpacity = 0.0;
+  bool _hintSeenMarked = false;
+  Timer? _hintRevealTimer;
+  Timer? _hintAutoFadeTimer;
+  Timer? _hintRemoveTimer;
 
   @override
   void initState() {
@@ -34,6 +42,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
+    _hintRevealTimer?.cancel();
+    _hintAutoFadeTimer?.cancel();
+    _hintRemoveTimer?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -44,10 +55,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (service.hasSeenHomeGestureHint()) return;
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Double tap to save • Hold to share')),
-    );
-    await service.setHomeGestureHintSeen(true);
+    setState(() {
+      _showGhostHint = true;
+      _ghostHintOpacity = 0.0;
+    });
+
+    _hintRevealTimer?.cancel();
+    _hintRevealTimer = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted || !_showGhostHint) return;
+      setState(() => _ghostHintOpacity = 0.5);
+    });
+
+    _hintAutoFadeTimer?.cancel();
+    _hintAutoFadeTimer = Timer(const Duration(seconds: 4), () {
+      _dismissGhostHint();
+    });
+  }
+
+  Future<void> _markHintSeenIfNeeded() async {
+    if (_hintSeenMarked) return;
+    _hintSeenMarked = true;
+    await ref.read(databaseServiceProvider).setHomeGestureHintSeen(true);
+  }
+
+  Future<void> _dismissGhostHint() async {
+    if (!_showGhostHint && _ghostHintOpacity == 0) {
+      await _markHintSeenIfNeeded();
+      return;
+    }
+
+    _hintRevealTimer?.cancel();
+    _hintAutoFadeTimer?.cancel();
+
+    if (mounted && _ghostHintOpacity != 0) {
+      setState(() => _ghostHintOpacity = 0.0);
+    }
+
+    _hintRemoveTimer?.cancel();
+    _hintRemoveTimer = Timer(const Duration(milliseconds: 900), () {
+      if (!mounted) return;
+      setState(() => _showGhostHint = false);
+    });
+
+    await _markHintSeenIfNeeded();
   }
 
   Future<void> _openFilters() async {
@@ -107,7 +157,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final quotes = ref
         .watch(filteredFeedProvider)
         .maybeWhen(data: (value) => value, orElse: () => <Quote>[]);
-    final feedPrefs = ref.watch(feedPreferencesProvider).maybeWhen(
+    final feedPrefs = ref
+        .watch(feedPreferencesProvider)
+        .maybeWhen(
           data: (value) => value,
           orElse: () => FeedPreferencesState.empty,
         );
@@ -121,7 +173,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final safeIndex = quotes.isEmpty
         ? 0
-        : _currentIndex.clamp(0, quotes.length - 1) ;
+        : _currentIndex.clamp(0, quotes.length - 1);
     final currentQuote = quotes.isNotEmpty ? quotes[safeIndex] : null;
 
     return Stack(
@@ -134,7 +186,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             controller: _pageController,
             scrollDirection: Axis.vertical,
             itemCount: quotes.length,
-            onPageChanged: (index) => setState(() => _currentIndex = index),
+            onPageChanged: (index) {
+              if (_showGhostHint) {
+                _dismissGhostHint();
+              }
+              setState(() => _currentIndex = index);
+            },
             itemBuilder: (context, index) => HomeQuoteCard(
               key: ValueKey(quotes[index].id),
               quote: quotes[index],
@@ -227,6 +284,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+        if (_showGhostHint)
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 36,
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: _ghostHintOpacity,
+                duration: const Duration(milliseconds: 900),
+                curve: Curves.easeOut,
+                child: const Text(
+                  'Double-tap to save  •  Long-press to share',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Inter',
+                    fontStyle: FontStyle.italic,
+                    letterSpacing: 1.2,
+                    fontSize: 12,
                   ),
                 ),
               ),

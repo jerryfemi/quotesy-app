@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/database_provider.dart';
@@ -81,188 +82,180 @@ class _FeedFilterSheetState extends ConsumerState<FeedFilterSheet> {
           ),
           child: Column(
             children: [
-                const SizedBox(height: 10),
-                Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
+              const SizedBox(height: 10),
+              Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(999),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Your Feed',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: () {
-                          setState(() => _expandedCategories.clear());
-                          ref.read(feedPreferencesProvider.notifier).reset();
-                        },
-                        child: const Text(
-                          'Reset',
-                          style: TextStyle(
-                            color: QColors.amberGlow,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                  child: Text(
-                    'Choose categories, then expand any category to refine by author.',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: QColors.textSubtle,
-                      height: 1.35,
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+                child: Row(
+                  children: [
+                    Text(
+                      'Your Feed',
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _expandedCategories.clear());
+                        ref.read(feedPreferencesProvider.notifier).reset();
+                      },
+                      child: const Text(
+                        'Reset',
+                        style: TextStyle(
+                          color: QColors.amberGlow,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                child: Text(
+                  'Choose categories, then expand any category to refine by author.',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: QColors.textSubtle,
+                    height: 1.35,
                   ),
                 ),
-                Expanded(
-                  child: ListView.builder(
-                    controller: scrollController,
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
-                    itemCount: QuoteCategory.all.length,
-                    itemBuilder: (context, index) {
-                      final category = QuoteCategory.all[index];
-                      final isSelected = prefsState.selectedCategories.contains(
-                        category,
-                      );
-                      final isExpanded = _expandedCategories.contains(category);
-                      final count = categoryCounts[category] ?? 0;
-                      final topAuthors =
-                          topAuthorsByCategory[category] ?? const <String>[];
-                      final authorsLoading = loadingCategories.contains(
-                        category,
-                      );
+              ),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+                  itemCount: QuoteCategory.all.length,
+                  itemBuilder: (context, index) {
+                    final category = QuoteCategory.all[index];
+                    final isSelected = prefsState.selectedCategories.contains(
+                      category,
+                    );
+                    final isExpanded = _expandedCategories.contains(category);
+                    final count = categoryCounts[category] ?? 0;
+                    final topAuthors =
+                        topAuthorsByCategory[category] ?? const <String>[];
+                    final authorsLoading = loadingCategories.contains(category);
 
-                      final selectedSubset =
-                          prefsState.selectedAuthors[category];
-                      final selectedAuthors = !isSelected
-                          ? <String>{}
-                          : (selectedSubset == null
-                                ? topAuthors.toSet()
-                                : selectedSubset.toSet());
+                    final selectedSubset = prefsState.selectedAuthors[category];
+                    final selectedAuthors = !isSelected
+                        ? <String>{}
+                        : (selectedSubset == null
+                              ? topAuthors.toSet()
+                              : selectedSubset.toSet());
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          curve: Curves.easeOut,
-                          padding: const EdgeInsets.fromLTRB(10, 4, 8, 6),
-                          decoration: BoxDecoration(
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOut,
+                        padding: const EdgeInsets.fromLTRB(10, 4, 8, 6),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Colors.white.withValues(alpha: 0.03)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
                             color: isSelected
-                                ? Colors.white.withValues(alpha: 0.03)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected
-                                  ? Colors.white.withValues(alpha: 0.10)
-                                  : Colors.white.withValues(alpha: 0.04),
-                              width: 1,
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              _CategoryRow(
-                                category: category,
-                                quoteCount: count,
-                                isSelected: isSelected,
-                                isExpanded: isExpanded,
-                                onToggleCategory: () => _toggleCategory(
-                                  prefsState,
-                                  category,
-                                ),
-                                onToggleExpanded: () {
-                                  setState(() {
-                                    if (isExpanded) {
-                                      _expandedCategories.remove(category);
-                                    } else {
-                                      _expandedCategories.add(category);
-                                    }
-                                  });
-                                },
-                              ),
-                              AnimatedSize(
-                                duration: const Duration(milliseconds: 220),
-                                curve: Curves.easeOutCubic,
-                                alignment: Alignment.topCenter,
-                                child: isExpanded
-                                    ? Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                          34,
-                                          6,
-                                          0,
-                                          2,
-                                        ),
-                                        child: authorsLoading
-                                            ? const Padding(
-                                                padding: EdgeInsets.symmetric(
-                                                  vertical: 10,
-                                                ),
-                                                child: SizedBox(
-                                                  width: 18,
-                                                  height: 18,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        strokeWidth: 2,
-                                                        color:
-                                                            QColors.textSubtle,
-                                                      ),
-                                                ),
-                                              )
-                                            : topAuthors.isEmpty
-                                            ? const Padding(
-                                                padding: EdgeInsets.only(
-                                                  bottom: 10,
-                                                ),
-                                                child: Text(
-                                                  'No high-frequency authors in this category yet.',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: QColors.textSubtle,
-                                                  ),
-                                                ),
-                                              )
-                                            : Column(
-                                                children: topAuthors
-                                                    .map(
-                                                      (author) => _AuthorRow(
-                                                        author: author,
-                                                        isSelected:
-                                                            selectedAuthors
-                                                                .contains(
-                                                                  author,
-                                                                ),
-                                                        onToggle: () =>
-                                                            _toggleAuthor(
-                                                              prefsState,
-                                                              category,
-                                                              topAuthors,
-                                                              author,
-                                                            ),
-                                                      ),
-                                                    )
-                                                    .toList(growable: false),
-                                              ),
-                                      )
-                                    : const SizedBox.shrink(),
-                              ),
-                            ],
+                                ? Colors.white.withValues(alpha: 0.10)
+                                : Colors.white.withValues(alpha: 0.04),
+                            width: 1,
                           ),
                         ),
-                      );
-                    },
-                  ),
+                        child: Column(
+                          children: [
+                            _CategoryRow(
+                              category: category,
+                              quoteCount: count,
+                              isSelected: isSelected,
+                              isExpanded: isExpanded,
+                              onToggleCategory: () =>
+                                  _toggleCategory(prefsState, category),
+                              onToggleExpanded: () {
+                                setState(() {
+                                  if (isExpanded) {
+                                    _expandedCategories.remove(category);
+                                  } else {
+                                    _expandedCategories.add(category);
+                                  }
+                                });
+                              },
+                            ),
+                            AnimatedSize(
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOutCubic,
+                              alignment: Alignment.topCenter,
+                              child: isExpanded
+                                  ? Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        34,
+                                        6,
+                                        0,
+                                        2,
+                                      ),
+                                      child: authorsLoading
+                                          ? const Padding(
+                                              padding: EdgeInsets.symmetric(
+                                                vertical: 10,
+                                              ),
+                                              child: SizedBox(
+                                                width: 18,
+                                                height: 18,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: QColors.textSubtle,
+                                                    ),
+                                              ),
+                                            )
+                                          : topAuthors.isEmpty
+                                          ? const Padding(
+                                              padding: EdgeInsets.only(
+                                                bottom: 10,
+                                              ),
+                                              child: Text(
+                                                'No high-frequency authors in this category yet.',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: QColors.textSubtle,
+                                                ),
+                                              ),
+                                            )
+                                          : Column(
+                                              children: topAuthors
+                                                  .map(
+                                                    (author) => _AuthorRow(
+                                                      author: author,
+                                                      isSelected:
+                                                          selectedAuthors
+                                                              .contains(author),
+                                                      onToggle: () =>
+                                                          _toggleAuthor(
+                                                            prefsState,
+                                                            category,
+                                                            topAuthors,
+                                                            author,
+                                                          ),
+                                                    ),
+                                                  )
+                                                  .toList(growable: false),
+                                            ),
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
+              ),
             ],
           ),
         );
@@ -270,10 +263,9 @@ class _FeedFilterSheetState extends ConsumerState<FeedFilterSheet> {
     );
   }
 
-  void _toggleCategory(
-    FeedPreferencesState state,
-    String category,
-  ) {
+  void _toggleCategory(FeedPreferencesState state, String category) {
+    HapticFeedback.selectionClick();
+
     final categories = state.selectedCategories.toSet();
     final selectedAuthors = Map<String, List<String>>.from(
       state.selectedAuthors,
@@ -302,6 +294,8 @@ class _FeedFilterSheetState extends ConsumerState<FeedFilterSheet> {
     List<String> topAuthors,
     String author,
   ) {
+    HapticFeedback.selectionClick();
+
     final categories = state.selectedCategories.toSet()..add(category);
     final selectedAuthors = Map<String, List<String>>.from(
       state.selectedAuthors,

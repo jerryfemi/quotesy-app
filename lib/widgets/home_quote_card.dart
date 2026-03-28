@@ -13,11 +13,7 @@ class HomeQuoteCard extends ConsumerStatefulWidget {
   final Quote quote;
   final Future<void> Function(Quote quote) onShare;
 
-  const HomeQuoteCard({
-    super.key,
-    required this.quote,
-    required this.onShare,
-  });
+  const HomeQuoteCard({super.key, required this.quote, required this.onShare});
 
   @override
   ConsumerState<HomeQuoteCard> createState() => _HomeQuoteCardState();
@@ -92,47 +88,53 @@ class _HomeQuoteCardState extends ConsumerState<HomeQuoteCard> {
           children: [
             ColoredBox(
               color: QColors.obsidian,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '"${widget.quote.text}"',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.displayMedium,
-                    ),
-                    const SizedBox(height: 28),
-                    Container(width: 40, height: 1, color: QColors.divider),
-                    const SizedBox(height: 20),
-                    Text(
-                      widget.quote.author.toUpperCase(),
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.labelLarge,
-                    ),
-                    if (widget.quote.sourceSection?.isNotEmpty == true) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        widget.quote.sourceSection!,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontStyle: FontStyle.italic,
-                          color: QColors.textSubtle,
-                          fontSize: 13,
+              child:
+                  Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              '"${widget.quote.text}"',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.displayMedium,
+                            ),
+                            const SizedBox(height: 28),
+                            Container(
+                              width: 40,
+                              height: 1,
+                              color: QColors.divider,
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              widget.quote.author.toUpperCase(),
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.labelLarge,
+                            ),
+                            if (widget.quote.sourceSection?.isNotEmpty ==
+                                true) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                widget.quote.sourceSection!,
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontStyle: FontStyle.italic,
+                                  color: QColors.textSubtle,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
+                      )
+                      .animate()
+                      .fadeIn(duration: 400.ms, curve: Curves.easeOut)
+                      .slideY(
+                        begin: 0.04,
+                        end: 0,
+                        duration: 400.ms,
+                        curve: Curves.easeOut,
                       ),
-                    ],
-                  ],
-                ),
-              )
-                  .animate()
-                  .fadeIn(duration: 400.ms, curve: Curves.easeOut)
-                  .slideY(
-                    begin: 0.04,
-                    end: 0,
-                    duration: 400.ms,
-                    curve: Curves.easeOut,
-                  ),
             ),
 
             IgnorePointer(
@@ -144,7 +146,10 @@ class _HomeQuoteCardState extends ConsumerState<HomeQuoteCard> {
                   transitionBuilder: (child, animation) => FadeTransition(
                     opacity: animation,
                     child: ScaleTransition(
-                      scale: Tween<double>(begin: 0.8, end: 1.0).animate(animation),
+                      scale: Tween<double>(
+                        begin: 0.8,
+                        end: 1.0,
+                      ).animate(animation),
                       child: child,
                     ),
                   ),
