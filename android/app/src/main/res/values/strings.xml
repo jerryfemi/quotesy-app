@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Quotesy</string>
+    <string name="quotesy_widget_description">A rotating daily quote from Quotesy</string>
+</resources>

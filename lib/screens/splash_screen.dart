@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/database_provider.dart';
+import '../services/home_widget_service.dart';
 import '../theme/quotesy_theme.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -83,6 +86,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     ]);
 
     if (!mounted) return;
+
+    final db = ref.read(databaseServiceProvider);
+    unawaited(refreshQuotesyHomeWidget(db));
+
     await _exitController.forward();
     if (!mounted) return;
     context.go('/home');
