@@ -294,7 +294,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           Positioned(
             left: 20,
             right: 20,
-            bottom: 36,
+            bottom: 100,
             child: IgnorePointer(
               child: AnimatedOpacity(
                 opacity: _ghostHintOpacity,
