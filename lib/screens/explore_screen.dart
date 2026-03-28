@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
 import '../models/category_style.dart';
 import '../services/database_service.dart';
@@ -6,17 +8,6 @@ import '../widgets/quotesy_nav_bar.dart';
 import '../widgets/reactive_light_card.dart';
 import '../theme/quotesy_theme.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ExploreScreen
-//
-// Vertical PageView of ReactiveLightCards.
-// Styles list built once in initState — not on every scroll frame.
-// Listener drives nav bar hide/show via raw pointer delta.
-//
-// Adaptive layout:
-//   - Phone: vertical hero PageView (focused card dynamics)
-//   - Tablet/Desktop: gallery grid for faster browsing
-// ─────────────────────────────────────────────────────────────────────────────
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
 
@@ -47,6 +38,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
     if ((page - _pageOffset.value).abs() > 0.005) {
       _pageOffset.value = page;
     }
+  }
+
+  void _openCategory(String category) {
+    HapticFeedback.lightImpact();
+    // URI-encode so spaces and & in category names are path-safe.
+    final encoded = Uri.encodeComponent(category);
+    context.push('/category/$encoded');
   }
 
   @override
@@ -105,10 +103,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
               1.0,
             );
 
-            return ReactiveLightCard(
-              style: _styles[index],
-              focusAmount: focusAmount,
-              glowBaseline: _glowBaseline,
+            final category = QuoteCategory.all[index];
+
+            return GestureDetector(
+              onTap: focusAmount > 0.5 ? () => _openCategory(category) : null,
+              child: ReactiveLightCard(
+                style: _styles[index],
+                focusAmount: focusAmount,
+                glowBaseline: _glowBaseline,
+              ),
             );
           },
         );
@@ -130,11 +133,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
       ),
       itemCount: _styles.length,
       itemBuilder: (context, index) {
-        return ReactiveLightCard(
-          style: _styles[index],
-          focusAmount: 1.0,
-          glowBaseline: _glowBaseline,
-          margin: EdgeInsets.zero,
+        final category = QuoteCategory.all[index];
+        return GestureDetector(
+          onTap: () => _openCategory(category),
+          child: ReactiveLightCard(
+            style: _styles[index],
+            focusAmount: 1.0,
+            glowBaseline: _glowBaseline,
+            margin: EdgeInsets.zero,
+          ),
         );
       },
     );

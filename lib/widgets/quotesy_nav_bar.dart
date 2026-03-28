@@ -233,7 +233,7 @@ class QuotesyNavBar extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _PillTabButton(
-                          icon: Icons.auto_awesome_outlined,
+                          icon: Icons.format_quote_outlined,
                           label: 'Home',
                           isActive: isHome,
                           onTap: () {
@@ -243,7 +243,7 @@ class QuotesyNavBar extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         _PillTabButton(
-                          icon: Icons.explore_outlined,
+                          icon: Icons.travel_explore_outlined,
                           label: 'Explore',
                           isActive: isExplore,
                           onTap: () {
@@ -265,9 +265,6 @@ class QuotesyNavBar extends StatelessWidget {
                     },
                     behavior: HitTestBehavior.opaque,
                     child: TweenAnimationBuilder<double>(
-                      // Animate the border/bg alpha so the glow actually
-                      // transitions — AnimatedContainer can't interpolate
-                      // BoxShadow, TweenAnimationBuilder can.
                       tween: Tween(begin: 0.0, end: isSaved ? 1.0 : 0.0),
                       duration: const Duration(milliseconds: 200),
                       curve: Curves.easeOut,
@@ -308,11 +305,7 @@ class QuotesyNavBar extends StatelessWidget {
                           child: Icon(
                             Icons.bookmark_outline_rounded,
                             size: 20,
-                            color: Color.lerp(
-                              Colors.white38,
-                              _kAmberGlow,
-                              t,
-                            ),
+                            color: Color.lerp(Colors.white38, _kAmberGlow, t),
                           ),
                         );
                       },

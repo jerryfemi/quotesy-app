@@ -8,12 +8,10 @@ import '../services/database_service.dart';
 import '../services/quote_share_service.dart';
 import '../theme/quotesy_theme.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Filter tab definition — fixed list, always shown in this order.
-// ─────────────────────────────────────────────────────────────────────────────
+
 class _FilterTab {
   final String label;
-  final String? category; // null = "All Saved"
+  final String? category; 
   const _FilterTab(this.label, this.category);
 }
 
@@ -27,9 +25,7 @@ const _tabs = [
   _FilterTab('FAITH', QuoteCategory.spiritualityAndFaith),
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SavedScreen
-// ─────────────────────────────────────────────────────────────────────────────
+
 class SavedScreen extends ConsumerStatefulWidget {
   const SavedScreen({super.key});
 
@@ -54,7 +50,7 @@ class _SavedScreenState extends ConsumerState<SavedScreen> {
       backgroundColor: QColors.obsidian,
       body: SafeArea(
         child: savedAsync.when(
-          loading: () => const SizedBox.shrink(), // local-first, never shows
+          loading: () => const SizedBox.shrink(),
           error: (e, _) => Center(
             child: Text('$e', style: const TextStyle(color: QColors.textGhost)),
           ),
@@ -62,10 +58,10 @@ class _SavedScreenState extends ConsumerState<SavedScreen> {
             final filtered = _filtered(quotes);
             return CustomScrollView(
               slivers: [
-                // ── HEADER ─────────────────────────────────────────────────
+                // HEADER
                 SliverToBoxAdapter(child: _Header()),
 
-                // ── FILTER TABS ────────────────────────────────────────────
+                // FILTER TABS 
                 SliverPersistentHeader(
                   pinned: true,
                   delegate: _TabBarDelegate(
@@ -308,7 +304,7 @@ class _SavedQuoteCard extends ConsumerWidget {
                             .toggle(quote.id),
                         behavior: HitTestBehavior.opaque,
                         child: const Icon(
-                          Icons.bookmark_rounded,
+                          Icons.bookmarks_rounded,
                           color: QColors.amberGlow,
                           size: 18,
                         ),

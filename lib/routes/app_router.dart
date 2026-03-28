@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+import 'package:quotesy/screens/category_screen.dart';
 
 import '../screens/home_screen.dart';
 import '../screens/explore_screen.dart';
@@ -17,20 +18,30 @@ final routerProvider = GoRouter(
       builder: (context, state, navigationShell) =>
           QuotesyShell(navigationShell: navigationShell),
       branches: [
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/explore', builder: (_, _) => const ExploreScreen()),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/saved', builder: (_, _) => const SavedScreen()),
-        ]),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(path: '/explore', builder: (_, _) => const ExploreScreen()),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(path: '/saved', builder: (_, _) => const SavedScreen()),
+          ],
+        ),
       ],
     ),
-
-    // Full-screen routes (no nav bar) go here as top-level GoRoutes:
-    // GoRoute(path: '/settings', builder: ...),
-    // GoRoute(path: '/quote/:id', builder: ...),
+    GoRoute(
+      path: '/category/:name',
+      builder: (context, state) {
+        final encoded = state.pathParameters['name'] ?? '';
+        final category = Uri.decodeComponent(encoded);
+        return CategoryFeedScreen(category: category);
+      },
+    ),
   ],
 );
