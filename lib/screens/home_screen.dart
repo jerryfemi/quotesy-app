@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:quotesy/widgets/streak_sheet.dart';
+import 'package:quotesy/widgets/streak/streak_sheet.dart';
 
 import '../models/quote.dart';
 import '../models/streak_model.dart';

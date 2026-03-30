@@ -57,10 +57,25 @@ class _StreakWeekSectionState extends State<StreakWeekSection> {
     final streakStart = lastOpened.subtract(Duration(days: streakLength - 1));
 
     DateTime earliestTrackedDay = streakStart;
-    if (widget.isBroken) {
-      final missedDay = today.subtract(const Duration(days: 1));
-      if (missedDay.isBefore(earliestTrackedDay)) {
-        earliestTrackedDay = missedDay;
+
+    // Include the previous streak range when broken
+    if (widget.isBroken &&
+        widget.streak.canRestore &&
+        widget.streak.brokenFromDate != null) {
+      final prevEnd = StreakData.dateOnly(widget.streak.brokenFromDate!);
+      final prevStart =
+          prevEnd.subtract(Duration(days: widget.streak.previousStreak - 1));
+      if (prevStart.isBefore(earliestTrackedDay)) {
+        earliestTrackedDay = prevStart;
+      }
+    }
+
+    // Include the earliest missed day when broken
+    if (widget.isBroken && widget.streak.brokenFromDate != null) {
+      final firstMissed = StreakData.dateOnly(widget.streak.brokenFromDate!)
+          .add(const Duration(days: 1));
+      if (firstMissed.isBefore(earliestTrackedDay)) {
+        earliestTrackedDay = firstMissed;
       }
     }
 
@@ -190,13 +205,26 @@ class _WeekStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final today = StreakData.dateOnly(DateTime.now());
 
-    // Pre-compute streak bounds once — not per cell
+    // Pre-compute current streak bounds
     final last = streak.lastOpenedDate != null
         ? StreakData.dateOnly(streak.lastOpenedDate!)
         : null;
     final streakLength = streak.currentStreak < 1 ? 1 : streak.currentStreak;
     final streakStart = last?.subtract(Duration(days: streakLength - 1));
-    final missedDay = isBroken ? today.subtract(const Duration(days: 1)) : null;
+    // Pre-compute previous streak bounds (only when broken/restorable)
+    DateTime? prevStreakStart;
+    DateTime? prevStreakEnd;
+    // Compute missed day range (all days between brokenFrom and today)
+    DateTime? missedStart;
+    DateTime? missedEnd;
+    if (isBroken && streak.canRestore && streak.brokenFromDate != null) {
+      final brokenFrom = StreakData.dateOnly(streak.brokenFromDate!);
+      prevStreakEnd = brokenFrom;
+      prevStreakStart =
+          brokenFrom.subtract(Duration(days: streak.previousStreak - 1));
+      missedStart = brokenFrom.add(const Duration(days: 1));
+      missedEnd = today.subtract(const Duration(days: 1));
+    }
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -207,7 +235,10 @@ class _WeekStrip extends StatelessWidget {
           today: today,
           streakStart: streakStart,
           streakEnd: last,
-          missedDay: missedDay,
+          missedStart: missedStart,
+          missedEnd: missedEnd,
+          prevStreakStart: prevStreakStart,
+          prevStreakEnd: prevStreakEnd,
         );
       }),
     );
@@ -225,13 +256,19 @@ class _DayCell extends StatelessWidget {
     required this.today,
     required this.streakStart,
     required this.streakEnd,
-    required this.missedDay,
+    required this.missedStart,
+    required this.missedEnd,
+    required this.prevStreakStart,
+    required this.prevStreakEnd,
   });
   final DateTime day;
   final DateTime today;
   final DateTime? streakStart;
   final DateTime? streakEnd;
-  final DateTime? missedDay;
+  final DateTime? missedStart;
+  final DateTime? missedEnd;
+  final DateTime? prevStreakStart;
+  final DateTime? prevStreakEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -240,12 +277,25 @@ class _DayCell extends StatelessWidget {
     final isToday = day == today;
     final isFuture = day.isAfter(today);
 
-    final isDone = !isFuture &&
+    // Check current streak range
+    final inCurrentStreak = !isFuture &&
         streakStart != null &&
         streakEnd != null &&
         !day.isBefore(streakStart!) &&
         !day.isAfter(streakEnd!);
-    final isMissed = missedDay != null && day == missedDay;
+
+    // Check previous streak range (when broken)
+    final inPrevStreak = !isFuture &&
+        prevStreakStart != null &&
+        prevStreakEnd != null &&
+        !day.isBefore(prevStreakStart!) &&
+        !day.isAfter(prevStreakEnd!);
+
+    final isDone = inCurrentStreak || inPrevStreak;
+    final isMissed = missedStart != null &&
+        missedEnd != null &&
+        !day.isBefore(missedStart!) &&
+        !day.isAfter(missedEnd!);
 
     _DayCellState cellState;
     if (isToday) {
@@ -281,7 +331,7 @@ class _DayCell extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Dot widget
+// Dot widget — check marks now sit inside a subtle circle
 // ─────────────────────────────────────────────────────────────────────────────
 class _DotWidget extends StatelessWidget {
   const _DotWidget({required this.state});
@@ -293,11 +343,19 @@ class _DotWidget extends StatelessWidget {
 
     switch (state) {
       case _DayCellState.todayActive:
-        return const SizedBox(
+        return Container(
           width: size,
           height: size,
-          child: Center(
-            child: Icon(Icons.check_rounded, size: 20, color: QColors.amberGlow),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: QColors.amber.withValues(alpha: 0.35),
+              width: 1.5,
+            ),
+          ),
+          child: const Center(
+            child:
+                Icon(Icons.check_rounded, size: 20, color: QColors.amberGlow),
           ),
         );
 
@@ -315,11 +373,19 @@ class _DotWidget extends StatelessWidget {
         );
 
       case _DayCellState.done:
-        return const SizedBox(
+        return Container(
           width: size,
           height: size,
-          child: Center(
-            child: Icon(Icons.check_rounded, size: 18, color: QColors.amberGlow),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: QColors.borderSubtle,
+              width: 1,
+            ),
+          ),
+          child: const Center(
+            child:
+                Icon(Icons.check_rounded, size: 18, color: QColors.amberGlow),
           ),
         );
 
@@ -352,7 +418,7 @@ class _DotWidget extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.07),
+              color: QColors.borderSubtle,
               width: 1,
             ),
           ),

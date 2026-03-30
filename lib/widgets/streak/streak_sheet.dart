@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -41,15 +42,16 @@ class StreakSheet extends ConsumerWidget {
     var streak = ref.watch(streakProvider);
 
     // ── DEBUG: uncomment to preview broken streak UI ──────────────────
+    if (kDebugMode) {
     streak = StreakData(
       currentStreak: 1,
-      bestStreak: 12,
+      bestStreak: 20,
       lastOpenedDate: DateTime.now(),
-      previousStreak: 12,
+      previousStreak: 20,
       brokenFromDate: StreakData.dateOnly(
-        DateTime.now().subtract(const Duration(days: 2)),
+        DateTime.now().subtract(const Duration(days: 4)),
       ),
-    );
+    );}
     // ── END DEBUG ─────────────────────────────────────────────────────
 
     final isLostVisually = _isLostVisually(streak);

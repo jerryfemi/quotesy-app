@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../models/streak_model.dart';
 import '../../theme/quotesy_theme.dart';
 import 'streak_reusables.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Restore section — shown only when canRestore is true (1 missed day)
+// Restore section — shown only when canRestore is true
 // ─────────────────────────────────────────────────────────────────────────────
 class StreakRestoreSection extends ConsumerWidget {
   const StreakRestoreSection({super.key, required this.streak});
@@ -14,8 +15,12 @@ class StreakRestoreSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // previousStreak + missed day + today
-    final restoredCount = streak.previousStreak + 2;
+    // previousStreak + all gap days + today
+    final brokenFrom = StreakData.dateOnly(streak.brokenFromDate!);
+    final today = StreakData.dateOnly(DateTime.now());
+    final restoredCount =
+        streak.previousStreak + today.difference(brokenFrom).inDays;
+    final gapDays = today.difference(brokenFrom).inDays - 1;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -25,17 +30,17 @@ class StreakRestoreSection extends ConsumerWidget {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.03),
+            color: QColors.amberSubtle.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.08),
+              color: QColors.amber.withValues(alpha: 0.25),
               width: 1,
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Before → after preview row
+              // Before → after preview row with spark
               Row(
                 children: [
                   const StreakPreviewPill(label: '1 day', isAfter: false),
@@ -51,12 +56,16 @@ class StreakRestoreSection extends ConsumerWidget {
                     label: '$restoredCount days',
                     isAfter: true,
                   ),
+                  const SizedBox(width: 8),
+                  const Text('✨', style: TextStyle(fontSize: 14)),
                 ],
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Restores your previous streak count and continues from today.',
-                style: TextStyle(
+              Text(
+                'Reclaim your ${streak.previousStreak}-day streak. '
+                "We'll bridge the $gapDays-day gap so you "
+                'continue from Day $restoredCount today.',
+                style: const TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 12,
                   color: QColors.textSubtle,
@@ -91,14 +100,29 @@ class StreakRestoreSection extends ConsumerWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
-              const Center(
-                child: Text(
-                  'Or continue from day 1',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 12,
-                    color: QColors.textSubtle,
+              const SizedBox(height: 6),
+
+              // "Start fresh" — real action with confirmation
+              Center(
+                child: TextButton(
+                  onPressed: () => _confirmDismiss(context, ref),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'No thanks, start fresh',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      color: QColors.textSubtle,
+                      decoration: TextDecoration.underline,
+                      decorationColor: QColors.textGhost,
+                    ),
                   ),
                 ),
               ),
@@ -107,5 +131,67 @@ class StreakRestoreSection extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _confirmDismiss(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: QColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: QColors.borderMid, width: 0.5),
+        ),
+        title: const Text(
+          'Start fresh?',
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: QColors.textPrimary,
+          ),
+        ),
+        content: Text(
+          'Your ${streak.previousStreak}-day streak will be gone forever. '
+          'This can\'t be undone.',
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 13,
+            color: QColors.textSubtle,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => context.pop( false),
+            child: const Text(
+              'Keep it',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: QColors.textMuted,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.pop(true),
+            child: const Text(
+              'Start fresh',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: QColors.danger,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      ref.read(streakProvider.notifier).dismissRestore();
+    }
   }
 }

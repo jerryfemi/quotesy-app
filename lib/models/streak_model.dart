@@ -25,10 +25,12 @@ class StreakData {
     this.brokenFromDate,
   });
 
-  /// Whether the streak was recently broken (exactly 1 missed day) and can
-  /// be restored. The window closes as soon as the user opens the app on the
-  /// next consecutive day (diff == 1 clears broken state).
-  bool get canRestore => previousStreak > 0 && brokenFromDate != null;
+  /// Whether the streak was recently broken and can be restored.
+  /// The grace period lasts as long as [currentStreak] remains exactly 1.
+  /// Once the user opens the app on the next consecutive day, the new streak
+  /// increments to 2 and the restore window closes permanently.
+  bool get canRestore =>
+      previousStreak > 0 && brokenFromDate != null && currentStreak == 1;
 
   /// Strips time component — only the date matters for streak logic.
   /// Shared utility so every call-site uses the same implementation.
@@ -146,25 +148,15 @@ class StreakNotifier extends Notifier<StreakData> {
       );
     }
 
-    if (diff == 2) {
-      // Exactly 1 day missed — save broken state for potential restore
-      return _save(
-        StreakData(
-          currentStreak: 1,
-          bestStreak: best,
-          lastOpenedDate: today,
-          previousStreak: current,
-          brokenFromDate: last,
-        ),
-      );
-    }
-
-    // Multiple days missed — no restore possible
+    // Streak broken (1+ days missed) — save broken state for potential restore.
+    // The restore window stays open until the user builds a new streak (day 2).
     return _save(
       StreakData(
         currentStreak: 1,
         bestStreak: best,
         lastOpenedDate: today,
+        previousStreak: current,
+        brokenFromDate: last,
       ),
     );
   }
@@ -176,8 +168,10 @@ class StreakNotifier extends Notifier<StreakData> {
     if (!data.canRestore) return;
 
     final today = StreakData.dateOnly(DateTime.now());
-    // previousStreak + missed day + today
-    final restoredStreak = data.previousStreak + 2;
+    final brokenFrom = StreakData.dateOnly(data.brokenFromDate!);
+    // Gap covers all missed days + today
+    final daysSinceBreak = today.difference(brokenFrom).inDays;
+    final restoredStreak = data.previousStreak + daysSinceBreak;
     final newBest =
         restoredStreak > data.bestStreak ? restoredStreak : data.bestStreak;
 
@@ -186,6 +180,22 @@ class StreakNotifier extends Notifier<StreakData> {
         currentStreak: restoredStreak,
         bestStreak: newBest,
         lastOpenedDate: today,
+      ),
+    );
+  }
+
+  /// Permanently dismisses the restore option.
+  /// The user has chosen to start fresh from day 1.
+  void dismissRestore() {
+    final data = state;
+    if (!data.canRestore) return;
+
+    state = _save(
+      StreakData(
+        currentStreak: data.currentStreak,
+        bestStreak: data.bestStreak,
+        lastOpenedDate: data.lastOpenedDate,
+        // Clear broken state — no more restore
       ),
     );
   }
