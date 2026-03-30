@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:quotesy/widgets/streak_sheet.dart';
 
 import '../models/quote.dart';
 import '../models/streak_model.dart';
@@ -104,6 +105,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     await showFeedFilterSheet(context, ref);
   }
 
+  Future<void> _openStreak() async {
+    await showStreakSheet(context, ref);
+  }
+
   Future<void> _shareQuote(Quote quote) async {
     await shareQuoteImage(context, quote);
   }
@@ -200,7 +205,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
 
-        Positioned(top: topPad + 12, left: 20, child: const _StreakIndicator()),
+        Positioned(top: topPad + 12, left: 20, child:  _StreakIndicator(() => _openStreak(),)),
 
         Positioned(
           top: topPad + 8,
@@ -320,45 +325,58 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 }
 
 class _StreakIndicator extends ConsumerWidget {
-  const _StreakIndicator();
-
+  const _StreakIndicator(this.onTap);
+  final VoidCallback onTap;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final streak = ref.watch(streakProvider);
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(
-              Icons.local_fire_department_rounded,
-              color: QColors.amberGlow,
-              size: 18,
-            )
-            .animate(onPlay: (controller) => controller.repeat(reverse: true))
-            .scaleXY(
-              begin: 1.0,
-              end: 1.18,
-              duration: 1500.ms,
-              curve: Curves.easeInOut,
-            )
-            .fade(
-              begin: 0.75,
-              end: 1.0,
-              duration: 1500.ms,
-              curve: Curves.easeInOut,
-            ),
-        const SizedBox(width: 5),
-        Text(
-          '${streak.currentStreak}',
-          style: const TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: QColors.amberGlow,
-            letterSpacing: 0.5,
+    return Semantics(
+      label: 'Open streak details',
+      button: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                    Icons.local_fire_department_rounded,
+                    color: QColors.amberGlow,
+                    size: 18,
+                  )
+                  .animate(
+                    onPlay: (controller) => controller.repeat(reverse: true),
+                  )
+                  .scaleXY(
+                    begin: 1.0,
+                    end: 1.18,
+                    duration: 1500.ms,
+                    curve: Curves.easeInOut,
+                  )
+                  .fade(
+                    begin: 0.75,
+                    end: 1.0,
+                    duration: 1500.ms,
+                    curve: Curves.easeInOut,
+                  ),
+              const SizedBox(width: 5),
+              Text(
+                '${streak.currentStreak}',
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: QColors.amberGlow,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }

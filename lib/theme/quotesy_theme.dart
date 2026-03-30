@@ -27,6 +27,12 @@ class QColors {
   static const borderSubtle = Color(0x12FFFFFF); // ~white7
   static const borderMid    = Color(0x1FFFFFFF); // ~white12
 
+  // Danger — streak broken / errors
+  static const danger       = Color(0xFFFF7070);
+  static const dangerMid    = Color(0x66FF7070);
+  static const dangerSubtle = Color(0x22FF5555);
+  static const dangerBorder = Color(0x44FF5555);
+
   // Divider
   static const divider = Color(0x26FFFFFF); // ~white15
 }

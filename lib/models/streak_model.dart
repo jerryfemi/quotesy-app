@@ -11,21 +11,43 @@ class StreakData {
   final int bestStreak;
   final DateTime? lastOpenedDate;
 
+  /// The streak count right before the last break (0 = no break recorded).
+  final int previousStreak;
+
+  /// The last active date before the streak broke.
+  final DateTime? brokenFromDate;
+
   const StreakData({
     this.currentStreak = 0,
     this.bestStreak = 0,
     this.lastOpenedDate,
+    this.previousStreak = 0,
+    this.brokenFromDate,
   });
+
+  /// Whether the streak was recently broken (exactly 1 missed day) and can
+  /// be restored. The window closes as soon as the user opens the app on the
+  /// next consecutive day (diff == 1 clears broken state).
+  bool get canRestore => previousStreak > 0 && brokenFromDate != null;
+
+  /// Strips time component — only the date matters for streak logic.
+  /// Shared utility so every call-site uses the same implementation.
+  static DateTime dateOnly(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
 
   StreakData copyWith({
     int? currentStreak,
     int? bestStreak,
     DateTime? lastOpenedDate,
-  }) => StreakData(
-    currentStreak: currentStreak ?? this.currentStreak,
-    bestStreak: bestStreak ?? this.bestStreak,
-    lastOpenedDate: lastOpenedDate ?? this.lastOpenedDate,
-  );
+    int? previousStreak,
+    DateTime? brokenFromDate,
+  }) =>
+      StreakData(
+        currentStreak: currentStreak ?? this.currentStreak,
+        bestStreak: bestStreak ?? this.bestStreak,
+        lastOpenedDate: lastOpenedDate ?? this.lastOpenedDate,
+        previousStreak: previousStreak ?? this.previousStreak,
+        brokenFromDate: brokenFromDate ?? this.brokenFromDate,
+      );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,7 +60,13 @@ class StreakData {
 //   - If 2+ days ago: streak resets to 1 — streak broken.
 //   - If never opened before: start at 1.
 //
-// Storage: Hive settings_box with three keys.
+// Restore:
+//   - When exactly 1 day is missed (diff == 2), the old streak is saved.
+//   - Restoring fills in the missed day, making the streak continuous.
+//   - If the user opens the app the next day without restoring, the broken
+//     state is cleared and they continue from streak 2.
+//
+// Storage: Hive settings_box with five keys.
 // No HiveObject needed — just primitive values.
 // ─────────────────────────────────────────────────────────────────────────────
 class StreakNotifier extends Notifier<StreakData> {
@@ -46,6 +74,8 @@ class StreakNotifier extends Notifier<StreakData> {
   static const _currentKey = 'streak_current';
   static const _bestKey = 'streak_best';
   static const _lastOpenedKey = 'streak_last_opened';
+  static const _previousStreakKey = 'streak_previous';
+  static const _brokenFromKey = 'streak_broken_from';
 
   Box get _box => Hive.box(_boxName);
 
@@ -53,7 +83,6 @@ class StreakNotifier extends Notifier<StreakData> {
   StreakData build() {
     final initState = ref.watch(databaseInitProvider);
     if (initState.isLoading || initState.hasError) {
-      // Defer box access until DatabaseService has opened all Hive boxes.
       return const StreakData();
     }
 
@@ -61,12 +90,16 @@ class StreakNotifier extends Notifier<StreakData> {
     final best = _box.get(_bestKey, defaultValue: 0) as int;
     final lastRaw = _box.get(_lastOpenedKey) as String?;
     final lastOpened = lastRaw != null ? DateTime.tryParse(lastRaw) : null;
+    final previous = _box.get(_previousStreakKey, defaultValue: 0) as int;
+    final brokenRaw = _box.get(_brokenFromKey) as String?;
+    final brokenFrom = brokenRaw != null ? DateTime.tryParse(brokenRaw) : null;
 
-    // Run the streak update on first build (i.e. on app open)
     return _calculateStreak(
       current: current,
       best: best,
       lastOpened: lastOpened,
+      previous: previous,
+      brokenFrom: brokenFrom,
     );
   }
 
@@ -74,8 +107,10 @@ class StreakNotifier extends Notifier<StreakData> {
     required int current,
     required int best,
     required DateTime? lastOpened,
+    required int previous,
+    required DateTime? brokenFrom,
   }) {
-    final today = _dateOnly(DateTime.now());
+    final today = StreakData.dateOnly(DateTime.now());
 
     if (lastOpened == null) {
       // First ever open
@@ -84,20 +119,22 @@ class StreakNotifier extends Notifier<StreakData> {
       );
     }
 
-    final last = _dateOnly(lastOpened);
+    final last = StreakData.dateOnly(lastOpened);
     final diff = today.difference(last).inDays;
 
     if (diff == 0) {
-      // Already opened today — no change
+      // Already opened today — no change, preserve broken state
       return StreakData(
         currentStreak: current,
         bestStreak: best,
         lastOpenedDate: last,
+        previousStreak: previous,
+        brokenFromDate: brokenFrom,
       );
     }
 
     if (diff == 1) {
-      // Consecutive day — increment
+      // Consecutive day — increment, clear any broken state
       final newCurrent = current + 1;
       final newBest = newCurrent > best ? newCurrent : best;
       return _save(
@@ -109,25 +146,60 @@ class StreakNotifier extends Notifier<StreakData> {
       );
     }
 
-    // Streak broken — reset to 1
+    if (diff == 2) {
+      // Exactly 1 day missed — save broken state for potential restore
+      return _save(
+        StreakData(
+          currentStreak: 1,
+          bestStreak: best,
+          lastOpenedDate: today,
+          previousStreak: current,
+          brokenFromDate: last,
+        ),
+      );
+    }
+
+    // Multiple days missed — no restore possible
     return _save(
       StreakData(
         currentStreak: 1,
-        bestStreak: best, // best streak is never reduced
+        bestStreak: best,
+        lastOpenedDate: today,
+      ),
+    );
+  }
+
+  /// Restores the streak as if the missed day never happened.
+  /// Only works when [StreakData.canRestore] is true.
+  void restoreStreak() {
+    final data = state;
+    if (!data.canRestore) return;
+
+    final today = StreakData.dateOnly(DateTime.now());
+    // previousStreak + missed day + today
+    final restoredStreak = data.previousStreak + 2;
+    final newBest =
+        restoredStreak > data.bestStreak ? restoredStreak : data.bestStreak;
+
+    state = _save(
+      StreakData(
+        currentStreak: restoredStreak,
+        bestStreak: newBest,
         lastOpenedDate: today,
       ),
     );
   }
 
   StreakData _save(StreakData data) {
-    _box.put(_currentKey, data.currentStreak);
-    _box.put(_bestKey, data.bestStreak);
-    _box.put(_lastOpenedKey, data.lastOpenedDate?.toIso8601String());
+    _box.putAll({
+      _currentKey: data.currentStreak,
+      _bestKey: data.bestStreak,
+      _lastOpenedKey: data.lastOpenedDate?.toIso8601String(),
+      _previousStreakKey: data.previousStreak,
+      _brokenFromKey: data.brokenFromDate?.toIso8601String(),
+    });
     return data;
   }
-
-  /// Strips time component — only the date matters for streak logic.
-  DateTime _dateOnly(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
 }
 
 final streakProvider = NotifierProvider<StreakNotifier, StreakData>(

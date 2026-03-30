@@ -6,12 +6,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
+import android.util.Log
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetProvider
 import org.json.JSONArray
 import org.json.JSONException
 
 class QuotesyHomeWidgetProvider : HomeWidgetProvider() {
+    private val tag = "QuotesyWidget"
 
     override fun onUpdate(
         context: Context,
@@ -20,28 +22,36 @@ class QuotesyHomeWidgetProvider : HomeWidgetProvider() {
         widgetData: SharedPreferences,
     ) {
         appWidgetIds.forEach { appWidgetId ->
-            val views = RemoteViews(context.packageName, R.layout.quotesy_home_widget)
-            val quotePair = nextQuote(widgetData)
-            views.setTextViewText(R.id.widget_quote, "\"${quotePair.first}\"")
-            views.setTextViewText(R.id.widget_author, quotePair.second.uppercase())
+            try {
+                val views = RemoteViews(context.packageName, R.layout.quotesy_home_widget)
+                val quotePair = nextQuote(widgetData)
+                views.setTextViewText(R.id.widget_quote, "\"${quotePair.first}\"")
+                views.setTextViewText(R.id.widget_author, quotePair.second.uppercase())
 
-            val intent = Intent(context, MainActivity::class.java).apply {
-                action = Intent.ACTION_VIEW
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                val intent = Intent(context, MainActivity::class.java).apply {
+                    action = Intent.ACTION_VIEW
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
+                val pendingIntent = PendingIntent.getActivity(
+                    context,
+                    appWidgetId,
+                    intent,
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    } else {
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                    },
+                )
+                views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
+
+                appWidgetManager.updateAppWidget(appWidgetId, views)
+            } catch (t: Throwable) {
+                Log.e(tag, "Failed to update widget id=$appWidgetId", t)
+                val fallbackViews = RemoteViews(context.packageName, R.layout.quotesy_home_widget)
+                fallbackViews.setTextViewText(R.id.widget_quote, "\"Open Quotesy to refresh your widget.\"")
+                fallbackViews.setTextViewText(R.id.widget_author, "QUOTESY")
+                appWidgetManager.updateAppWidget(appWidgetId, fallbackViews)
             }
-            val pendingIntent = PendingIntent.getActivity(
-                context,
-                appWidgetId,
-                intent,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                } else {
-                    PendingIntent.FLAG_UPDATE_CURRENT
-                },
-            )
-            views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
-
-            appWidgetManager.updateAppWidget(appWidgetId, views)
         }
     }
 
@@ -75,6 +85,7 @@ class QuotesyHomeWidgetProvider : HomeWidgetProvider() {
             val author = item.optString("author", fallbackAuthor ?: "Quotesy")
             Pair(text, author)
         } catch (e: JSONException) {
+            Log.w(tag, "Failed to parse widget quote pool JSON", e)
             Pair(
                 fallbackQuote ?: "Open Quotesy to load your first quote.",
                 fallbackAuthor ?: "Quotesy",

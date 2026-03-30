@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../models/quote.dart';
 import '../providers/database_provider.dart';
@@ -357,7 +358,7 @@ class _QuoteDetailScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return GestureDetector(
-      onTap: () => Navigator.of(context).pop(),
+      onTap: () => context.pop(),
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: Stack(
@@ -414,7 +415,7 @@ class _QuoteDetailScreen extends ConsumerWidget {
                   GestureDetector(
                     onTap: () {
                       ref.read(savedQuotesProvider.notifier).toggle(quote.id);
-                      Navigator.of(context).pop();
+                      context.pop();
                     },
                     behavior: HitTestBehavior.opaque,
                     child: const Icon(

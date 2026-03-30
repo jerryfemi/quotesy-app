@@ -35,6 +35,10 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
 
             // Enable R8 minification and resource shrinking to reduce binary size.
             isMinifyEnabled = true
@@ -45,4 +49,9 @@ android {
 
 flutter { source = "../.." }
 
-dependencies { coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4") }
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // Required for Flutter's split install/deferred component classes during R8.
+    implementation("com.google.android.play:core:1.10.3")
+}
