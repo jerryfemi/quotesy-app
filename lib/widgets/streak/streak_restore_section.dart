@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
 import '../../models/streak_model.dart';
 import '../../theme/quotesy_theme.dart';
@@ -9,17 +11,24 @@ import 'streak_reusables.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 // Restore section — shown only when canRestore is true
 // ─────────────────────────────────────────────────────────────────────────────
-class StreakRestoreSection extends ConsumerWidget {
+class StreakRestoreSection extends ConsumerStatefulWidget {
   const StreakRestoreSection({super.key, required this.streak});
   final StreakData streak;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StreakRestoreSection> createState() => _StreakRestoreSectionState();
+}
+
+class _StreakRestoreSectionState extends ConsumerState<StreakRestoreSection> {
+  bool _isProcessing = false;
+
+  @override
+  Widget build(BuildContext context) {
     // previousStreak + all gap days + today
-    final brokenFrom = StreakData.dateOnly(streak.brokenFromDate!);
+    final brokenFrom = StreakData.dateOnly(widget.streak.brokenFromDate!);
     final today = StreakData.dateOnly(DateTime.now());
     final restoredCount =
-        streak.previousStreak + today.difference(brokenFrom).inDays;
+        widget.streak.previousStreak + today.difference(brokenFrom).inDays;
     final gapDays = today.difference(brokenFrom).inDays - 1;
 
     return Column(
@@ -62,7 +71,7 @@ class StreakRestoreSection extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Reclaim your ${streak.previousStreak}-day streak. '
+                'Reclaim your ${widget.streak.previousStreak}-day streak. '
                 "We'll bridge the $gapDays-day gap so you "
                 'continue from Day $restoredCount today.',
                 style: const TextStyle(
@@ -74,30 +83,76 @@ class StreakRestoreSection extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
-              // ── TODO: wire payment flow before calling restoreStreak ──
+              // ── RevenueCat Payment Flow ──
               SizedBox(
                 width: double.infinity,
                 child: TextButton(
-                  onPressed: () {
-                    ref.read(streakProvider.notifier).restoreStreak();
-                    Navigator.pop(context);
-                  },
+                  onPressed: _isProcessing
+                      ? null
+                      : () async {
+                          setState(() => _isProcessing = true);
+                          try {
+                            // Initiate purchase of the streak repair consumable
+                            final products = await Purchases.getProducts(
+                              ['streak_repair_99'],
+                              productCategory: ProductCategory.nonSubscription,
+                            );
+                            if (products.isEmpty) {
+                              throw Exception('Product not found');
+                            }
+                            await Purchases.purchase(
+                                PurchaseParams.storeProduct(products.first));
+
+                            // If execution reaches here, purchase was successful
+                            if (context.mounted) {
+                              ref.read(streakProvider.notifier).restoreStreak();
+                              context.pop();
+                            }
+                          } on PlatformException catch (e) {
+                            var errorCode = PurchasesErrorHelper.getErrorCode(e);
+                            if (errorCode != PurchasesErrorCode.purchaseCancelledError) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Purchase failed. Please try again.'),
+                                    backgroundColor: QColors.danger,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
+                          } finally {
+                            if (mounted) {
+                              setState(() => _isProcessing = false);
+                            }
+                          }
+                        },
                   style: TextButton.styleFrom(
                     backgroundColor: QColors.amber,
+                    disabledBackgroundColor: QColors.amber.withValues(alpha: 0.5),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    'Restore streak',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: QColors.obsidian,
-                    ),
-                  ),
+                  child: _isProcessing
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(QColors.obsidian),
+                          ),
+                        )
+                      : const Text(
+                          'Restore streak · \$0.99',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: QColors.obsidian,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 6),
@@ -152,7 +207,7 @@ class StreakRestoreSection extends ConsumerWidget {
           ),
         ),
         content: Text(
-          'Your ${streak.previousStreak}-day streak will be gone forever. '
+          'Your ${widget.streak.previousStreak}-day streak will be gone forever. '
           'This can\'t be undone.',
           style: const TextStyle(
             fontFamily: 'Inter',

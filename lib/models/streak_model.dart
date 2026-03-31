@@ -42,14 +42,13 @@ class StreakData {
     DateTime? lastOpenedDate,
     int? previousStreak,
     DateTime? brokenFromDate,
-  }) =>
-      StreakData(
-        currentStreak: currentStreak ?? this.currentStreak,
-        bestStreak: bestStreak ?? this.bestStreak,
-        lastOpenedDate: lastOpenedDate ?? this.lastOpenedDate,
-        previousStreak: previousStreak ?? this.previousStreak,
-        brokenFromDate: brokenFromDate ?? this.brokenFromDate,
-      );
+  }) => StreakData(
+    currentStreak: currentStreak ?? this.currentStreak,
+    bestStreak: bestStreak ?? this.bestStreak,
+    lastOpenedDate: lastOpenedDate ?? this.lastOpenedDate,
+    previousStreak: previousStreak ?? this.previousStreak,
+    brokenFromDate: brokenFromDate ?? this.brokenFromDate,
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -172,8 +171,9 @@ class StreakNotifier extends Notifier<StreakData> {
     // Gap covers all missed days + today
     final daysSinceBreak = today.difference(brokenFrom).inDays;
     final restoredStreak = data.previousStreak + daysSinceBreak;
-    final newBest =
-        restoredStreak > data.bestStreak ? restoredStreak : data.bestStreak;
+    final newBest = restoredStreak > data.bestStreak
+        ? restoredStreak
+        : data.bestStreak;
 
     state = _save(
       StreakData(
@@ -196,6 +196,22 @@ class StreakNotifier extends Notifier<StreakData> {
         bestStreak: data.bestStreak,
         lastOpenedDate: data.lastOpenedDate,
         // Clear broken state — no more restore
+      ),
+    );
+  }
+
+  /// DEBUG ONLY: writes a fake broken streak into the real DB so the
+  /// full restore → payment → restoreStreak() flow can be tested e2e.
+  void debugBreakStreak() {
+    state = _save(
+      StreakData(
+        currentStreak: 1,
+        bestStreak: state.bestStreak > 20 ? state.bestStreak : 20,
+        lastOpenedDate: StreakData.dateOnly(DateTime.now()),
+        previousStreak: 20,
+        brokenFromDate: StreakData.dateOnly(
+          DateTime.now().subtract(const Duration(days: 4)),
+        ),
       ),
     );
   }

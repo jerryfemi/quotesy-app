@@ -14,6 +14,16 @@ Future<void> showStreakSheet(BuildContext context, WidgetRef ref) async {
   final nav = NavBarControllerScope.of(context);
   nav.hide();
 
+  // ── DEBUG: Test the full restore + payment flow ───────────────────
+  // Writes fake broken-streak data into the real DB so restoreStreak()
+  // actually works after purchase. Remove / re-comment before release.
+  if (kDebugMode) {
+    if (!ref.read(streakProvider).canRestore) {
+      ref.read(streakProvider.notifier).debugBreakStreak();
+    }
+  }
+  // ── END DEBUG ─────────────────────────────────────────────────────
+
   try {
     await showModalBottomSheet<void>(
       context: context,
@@ -38,21 +48,7 @@ class StreakSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ignore: unused_local_variable
-    var streak = ref.watch(streakProvider);
-
-    // ── DEBUG: uncomment to preview broken streak UI ──────────────────
-    if (kDebugMode) {
-    streak = StreakData(
-      currentStreak: 1,
-      bestStreak: 20,
-      lastOpenedDate: DateTime.now(),
-      previousStreak: 20,
-      brokenFromDate: StreakData.dateOnly(
-        DateTime.now().subtract(const Duration(days: 4)),
-      ),
-    );}
-    // ── END DEBUG ─────────────────────────────────────────────────────
+    final streak = ref.watch(streakProvider);
 
     final isLostVisually = _isLostVisually(streak);
     final bottomPadding = MediaQuery.maybeOf(context)?.padding.bottom ?? 0;
