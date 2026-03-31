@@ -10,8 +10,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize RevenueCat
-  await Purchases.setLogLevel(LogLevel.debug);
-  await Purchases.configure(PurchasesConfiguration('test_mCEpBRaEhFytinrhqwqhnAxdRMG'));
+  // await Purchases.setLogLevel(LogLevel.debug);
+  // await Purchases.configure(PurchasesConfiguration('test_mCEpBRaEhFytinrhqwqhnAxdRMG'));
 
   runApp(
     DevicePreview(

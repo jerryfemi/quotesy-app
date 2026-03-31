@@ -19,8 +19,8 @@ if not api_key:
     exit(1)
 
 MODEL_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-OUTPUT_FILE = "new_scraped_quotes.json"
-EXISTING_QUOTES_FILE = "../assets/quotes.json" # Relative to scripts folder
+OUTPUT_FILE = "new_scraped_quotes.json" # Relative to project root if run from root
+EXISTING_QUOTES_FILE = "assets/quotes.json" # Relative to project root
 BATCH_SIZE = 25
 TARGET_FINAL_QUOTES = 100
 
@@ -53,14 +53,15 @@ RULES:
 3. RAMBLING/FLUFF: If a quote has a brilliant core sentence buried in fluff, vigorously TRIM it down to JUST the profound sentence(s).
 4. PERFECT: If a quote is already perfect, punchy, and profound: keep it exactly as written.
 5. CATEGORIZE: You MUST pick the single best category for the quote from this exact list: {", ".join(CATEGORIES)}. If it does not strongly fit any of these 6 categories, return "REJECT" for its text.
+6. EXISTENTIAL FOCUS: We are currently building a defining 'Existential' collection. Prioritize quotes exploring suffering, freedom, mortality, and the search for meaning. If a quote fits 'Existential' even slightly better than another category, prioritize 'Existential'.
 
 RESPOND ONLY WITH VALID JSON.
 Format your response exactly as a JSON object mapping the ID to a sub-object containing the edit and category.
 Example:
 {{
-  "0": {{"text": "The trimmed, powerful quote...", "category": "Existential"}},
+  "0": {{"text": "Man is condemned to be free...", "category": "Existential"}},
   "1": {{"text": "REJECT", "category": "REJECT"}},
-  "2": {{"text": "The perfect quote as written.", "category": "Wit & Wisdom"}}
+  "2": {{"text": "The meaning of life is to find your gift.", "category": "Existential"}}
 }}
 """
 
@@ -83,8 +84,11 @@ def load_existing_fingerprints() -> set:
     ]
     
     try:
-        # Check if running from root or within scripts/
-        path = "assets/quotes.json" if os.path.exists("assets/quotes.json") else EXISTING_QUOTES_FILE
+        path = EXISTING_QUOTES_FILE
+        if not os.path.exists(path):
+            # Fallback for scripts/ folder execution
+            path = os.path.join("..", EXISTING_QUOTES_FILE)
+        
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
             for q in data:
@@ -236,13 +240,7 @@ def refine_quotes(author_name: str, raw_quotes: list[dict]) -> list[dict]:
 
 def main():
     AUTHORS_TO_SCRAPE = [
-        "Fyodor Dostoevsky",
-        "Franz Kafka",
-        "Charles Bukowski",
-        "Sigmund Freud",
-        "Michel de Montaigne",
-        "George Eliot",
-        "Ernest Hemingway"
+        "Fyodor Dostoevsky"
     ]
     
     # 1. Load the Duplicate Guard

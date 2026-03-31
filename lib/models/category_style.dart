@@ -57,7 +57,7 @@ class CategoryStyle {
         return CategoryStyle(
           categoryName: category,
           displayTitle: 'The Shadow',
-          tagLine: 'PSYCHOLOGY & JUNG',
+          tagLine: 'PSYCHOLOGY & SELF',
           subtitle:
               'Journey through the hidden recesses of the psyche and the beauty of the unknown.',
           primaryColor: const Color(0xFFCCCCCC),

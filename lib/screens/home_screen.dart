@@ -299,11 +299,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           Positioned(
             left: 20,
             right: 20,
-            bottom: 100,
+            bottom: 160,
             child: IgnorePointer(
               child: AnimatedOpacity(
                 opacity: _ghostHintOpacity,
-                duration: const Duration(milliseconds: 900),
+                duration: const Duration(seconds: 3),
                 curve: Curves.easeOut,
                 child: const Text(
                   'Double-tap to save  •  Long-press to share',

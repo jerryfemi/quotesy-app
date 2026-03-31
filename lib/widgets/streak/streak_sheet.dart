@@ -14,16 +14,6 @@ Future<void> showStreakSheet(BuildContext context, WidgetRef ref) async {
   final nav = NavBarControllerScope.of(context);
   nav.hide();
 
-  // ── DEBUG: Test the full restore + payment flow ───────────────────
-  // Writes fake broken-streak data into the real DB so restoreStreak()
-  // actually works after purchase. Remove / re-comment before release.
-  if (kDebugMode) {
-    if (!ref.read(streakProvider).canRestore) {
-      ref.read(streakProvider.notifier).debugBreakStreak();
-    }
-  }
-  // ── END DEBUG ─────────────────────────────────────────────────────
-
   try {
     await showModalBottomSheet<void>(
       context: context,
@@ -122,6 +112,25 @@ class StreakSheet extends ConsumerWidget {
                       const SizedBox(height: 24),
                     ],
                     StreakRulesSection(isActive: !isLostVisually),
+                    if (kDebugMode && !streak.canRestore) ...[
+                      const SizedBox(height: 32),
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: () {
+                            ref.read(streakProvider.notifier).debugBreakStreak();
+                          },
+                          icon: const Icon(Icons.bug_report_outlined, size: 16),
+                          label: const Text('Debug: Force Break'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: QColors.danger,
+                            textStyle: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

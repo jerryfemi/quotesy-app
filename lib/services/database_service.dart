@@ -11,8 +11,8 @@ const _quotesBoxName = 'quotes_box';
 const _savedBoxName = 'saved_box';
 const _settingsBoxName = 'settings_box';
 const _preferencesBoxName = 'preferences_box';
-const _importCompleteKey = 'import_v3_complete';
-const _categoryIndexKey = 'category_index_v3';
+const _importCompleteKey = 'import_v5_complete';
+const _categoryIndexKey = 'category_index_v5';
 const _selectedCategoriesKey = 'selected_categories_v1';
 const _selectedAuthorsKey = 'selected_authors_v1';
 const _homeGestureHintSeenKey = 'home_gesture_hint_seen_v1';
@@ -81,7 +81,7 @@ class DatabaseService {
   int? _cachedFilteredSignature;
   List<Quote>? _cachedFilteredFeed;
   final Map<String, List<String>> _topAuthorsCache = {};
-  static const int _topAuthorsMinQuotes = 10;
+  static const int _topAuthorsMinQuotes = 1;
   static const int _topAuthorsMax = 10;
 
   Box<Quote> get _quotesBox {
@@ -250,27 +250,31 @@ class DatabaseService {
   }
 
   Future<void> setSelectedCategories(List<String> categories) async {
-    final normalized = categories
-        .map((category) => category.trim())
-        .where((category) => category.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
+    final normalized =
+        categories
+            .map((category) => category.trim())
+            .where((category) => category.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
 
     await _preferencesBox.put(_selectedCategoriesKey, normalized);
     _invalidateFilteredFeedCache();
   }
 
-  Future<void> setSelectedAuthors(Map<String, List<String>> selectedAuthors) async {
+  Future<void> setSelectedAuthors(
+    Map<String, List<String>> selectedAuthors,
+  ) async {
     final normalized = <String, List<String>>{};
 
     selectedAuthors.forEach((category, authors) {
-      final cleaned = authors
-          .map((author) => author.trim())
-          .where((author) => author.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
+      final cleaned =
+          authors
+              .map((author) => author.trim())
+              .where((author) => author.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
 
       if (cleaned.isNotEmpty) {
         normalized[category] = cleaned;
@@ -307,19 +311,20 @@ class DatabaseService {
       counts.update(quote.author, (count) => count + 1, ifAbsent: () => 1);
     }
 
-    final filtered = counts.entries
-        .where((entry) => entry.value >= _topAuthorsMinQuotes)
-        .toList()
-      ..sort((a, b) {
-        final byCount = b.value.compareTo(a.value);
-        if (byCount != 0) return byCount;
-        return a.key.compareTo(b.key);
-      });
+    final filtered =
+        counts.entries
+            .where((entry) => entry.value >= _topAuthorsMinQuotes)
+            .toList()
+          ..sort((a, b) {
+            final byCount = b.value.compareTo(a.value);
+            if (byCount != 0) return byCount;
+            return a.key.compareTo(b.key);
+          });
 
     final result = filtered
-      .take(_topAuthorsMax)
-      .map((entry) => entry.key)
-      .toList(growable: false);
+        .take(_topAuthorsMax)
+        .map((entry) => entry.key)
+        .toList(growable: false);
 
     _topAuthorsCache[category] = result;
     return result;
@@ -329,21 +334,23 @@ class DatabaseService {
     required List<String> selectedCategories,
     required Map<String, List<String>> selectedAuthors,
   }) {
-    final normalizedCategories = selectedCategories
-        .map((category) => category.trim())
-        .where((category) => category.isNotEmpty)
-        .toSet()
-        .toList(growable: false)
-      ..sort();
+    final normalizedCategories =
+        selectedCategories
+            .map((category) => category.trim())
+            .where((category) => category.isNotEmpty)
+            .toSet()
+            .toList(growable: false)
+          ..sort();
 
     final normalizedAuthors = <String, List<String>>{};
     selectedAuthors.forEach((category, authors) {
-      final cleaned = authors
-          .map((author) => author.trim())
-          .where((author) => author.isNotEmpty)
-          .toSet()
-          .toList(growable: false)
-        ..sort();
+      final cleaned =
+          authors
+              .map((author) => author.trim())
+              .where((author) => author.isNotEmpty)
+              .toSet()
+              .toList(growable: false)
+            ..sort();
 
       if (cleaned.isNotEmpty) {
         normalizedAuthors[category] = cleaned;
@@ -359,12 +366,15 @@ class DatabaseService {
     }
 
     final effectiveCategories = hasCategorySelections
-      ? normalizedCategories
+        ? normalizedCategories
         : hasAuthorSelections
         ? normalizedAuthors.keys.toList(growable: false)
-            : const <String>[];
+        : const <String>[];
 
-    final signature = _buildFilterSignature(effectiveCategories, normalizedAuthors);
+    final signature = _buildFilterSignature(
+      effectiveCategories,
+      normalizedAuthors,
+    );
     if (_cachedFilteredSignature == signature && _cachedFilteredFeed != null) {
       return _cachedFilteredFeed!;
     }
