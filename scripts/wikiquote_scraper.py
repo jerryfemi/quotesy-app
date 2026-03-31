@@ -74,14 +74,24 @@ def get_fingerprint(text: str) -> str:
 def load_existing_fingerprints() -> set:
     """Load your current master library to prevent scraping identical quotes."""
     seen = set()
+    
+    # Only guard against these specific authors to avoid unnecessary filtering
+    AUTHORS_TO_GUARD = [
+        "Fyodor Dostoevsky", 
+        "Franz Kafka", 
+        "Michel de Montaigne"
+    ]
+    
     try:
         # Check if running from root or within scripts/
         path = "assets/quotes.json" if os.path.exists("assets/quotes.json") else EXISTING_QUOTES_FILE
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
             for q in data:
-                seen.add(get_fingerprint(q.get("text", "")))
-        print(f"🛡️ Loaded {len(seen)} existing quotes into duplicate guard.")
+                # Check if the existing quote belongs to one of our guarded authors
+                if q.get("author") in AUTHORS_TO_GUARD:
+                    seen.add(get_fingerprint(q.get("text", "")))
+        print(f"🛡️ Loaded {len(seen)} existing quotes into duplicate guard for specific authors.")
     except Exception as e:
         print(f"⚠️ Could not load existing quotes for duplicate guard: {e}")
     return seen
