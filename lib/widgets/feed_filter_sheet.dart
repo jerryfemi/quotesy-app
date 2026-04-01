@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/database_provider.dart';
 import '../services/database_service.dart';
+import '../services/notification_service.dart';
 import '../theme/quotesy_theme.dart';
 import 'quotesy_nav_bar.dart';
 
@@ -25,6 +26,14 @@ Future<void> showFeedFilterSheet(BuildContext context, WidgetRef ref) async {
   } finally {
     nav.show();
     await ref.read(feedPreferencesProvider.notifier).flushNow();
+
+    // Reschedule daily quotes to reflect updated filter preferences.
+    final db = ref.read(databaseServiceProvider);
+    final quotes = await db.getFilteredFeed(
+      selectedCategories: db.getSelectedCategories(),
+      selectedAuthors: db.getSelectedAuthors(),
+    );
+    await NotificationService().scheduleDailyQuotes(quotes);
   }
 }
 

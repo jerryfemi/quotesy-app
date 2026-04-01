@@ -7,6 +7,7 @@ import '../services/database_service.dart';
 import '../widgets/quotesy_nav_bar.dart';
 import '../widgets/reactive_light_card.dart';
 import '../theme/quotesy_theme.dart';
+import '../widgets/debug_notifications_sheet.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -62,9 +63,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return Scaffold(
       backgroundColor: QColors.obsidian,
       appBar: AppBar(
-        title: Text(
-          'Explore',
-          style: Theme.of(context).textTheme.headlineMedium,
+        title: GestureDetector(
+          onLongPress: () => DebugNotificationsSheet.show(context),
+          behavior: HitTestBehavior.opaque,
+          child: Text(
+            'Explore',
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
         ),
       ),
       body: Listener(

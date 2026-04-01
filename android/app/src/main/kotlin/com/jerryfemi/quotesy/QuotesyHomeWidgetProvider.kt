@@ -1,4 +1,4 @@
-package com.example.quotes
+package com.jerryfemi.quotesy
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager

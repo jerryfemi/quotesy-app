@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../providers/database_provider.dart';
+import '../services/notification_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // StreakData — the data model stored in Hive
@@ -224,6 +225,10 @@ class StreakNotifier extends Notifier<StreakData> {
       _previousStreakKey: data.previousStreak,
       _brokenFromKey: data.brokenFromDate?.toIso8601String(),
     });
+
+    // Reschedule streak reminders based on the freshly-saved state.
+    NotificationService().scheduleStreakReminders(data);
+
     return data;
   }
 }
