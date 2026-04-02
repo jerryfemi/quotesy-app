@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -332,10 +333,7 @@ class _NarrowFeedHint extends ConsumerWidget {
           decoration: BoxDecoration(
             color: QColors.borderSubtle,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: QColors.borderMid,
-              width: 1,
-            ),
+            border: Border.all(color: QColors.borderMid, width: 1),
           ),
           child: const Padding(
             padding: EdgeInsets.fromLTRB(14, 10, 14, 11),
@@ -369,9 +367,15 @@ class _NarrowFeedHint extends ConsumerWidget {
 class _StreakIndicator extends ConsumerWidget {
   const _StreakIndicator(this.onTap);
   final VoidCallback onTap;
+
+  static const bool _debugScreenshotMode = true;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final streak = ref.watch(streakProvider);
+    final displayStreak = (kDebugMode && _debugScreenshotMode)
+        ? 24
+        : streak.currentStreak;
 
     return Semantics(
       label: 'Open streak details',
@@ -406,7 +410,7 @@ class _StreakIndicator extends ConsumerWidget {
                   ),
               const SizedBox(width: 5),
               Text(
-                '${streak.currentStreak}',
+                '$displayStreak',
                 style: const TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 13,

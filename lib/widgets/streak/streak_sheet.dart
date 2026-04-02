@@ -38,7 +38,16 @@ class StreakSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final streak = ref.watch(streakProvider);
+    var streak = ref.watch(streakProvider);
+
+    // Sync with Home Screen's debug screenshot mode
+    const bool debugScreenshotMode = true;
+    if (kDebugMode && debugScreenshotMode) {
+      streak = streak.copyWith(
+        currentStreak: 24,
+        bestStreak: streak.bestStreak < 24 ? 24 : streak.bestStreak,
+      );
+    }
 
     final isLostVisually = _isLostVisually(streak);
     final bottomPadding = MediaQuery.maybeOf(context)?.padding.bottom ?? 0;
@@ -112,25 +121,6 @@ class StreakSheet extends ConsumerWidget {
                       const SizedBox(height: 24),
                     ],
                     StreakRulesSection(isActive: !isLostVisually),
-                    if (kDebugMode && !streak.canRestore) ...[
-                      const SizedBox(height: 32),
-                      Center(
-                        child: TextButton.icon(
-                          onPressed: () {
-                            ref.read(streakProvider.notifier).debugBreakStreak();
-                          },
-                          icon: const Icon(Icons.bug_report_outlined, size: 16),
-                          label: const Text('Debug: Force Break'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: QColors.danger,
-                            textStyle: const TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),

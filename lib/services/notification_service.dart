@@ -2,12 +2,31 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../models/quote.dart';
 import '../models/streak_model.dart';
 import '../theme/quotesy_theme.dart';
+
+class NotificationDiagnostics {
+  const NotificationDiagnostics({
+    required this.notificationsEnabled,
+    required this.canScheduleExact,
+    required this.scheduleMode,
+    required this.pendingCount,
+    required this.dailyQuotePendingCount,
+    required this.pendingSummary,
+  });
+
+  final bool? notificationsEnabled;
+  final bool? canScheduleExact;
+  final AndroidScheduleMode scheduleMode;
+  final int pendingCount;
+  final int dailyQuotePendingCount;
+  final List<String> pendingSummary;
+}
 
 /// Central notification engine for Quotesy.
 ///
@@ -39,6 +58,16 @@ class NotificationService {
 
   Future<void> init() async {
     tz.initializeTimeZones();
+    try {
+      final dynamic info = await FlutterTimezone.getLocalTimezone();
+      final String timeZoneName = info?.toString() ?? 'UTC';
+      tz.setLocalLocation(tz.getLocation(timeZoneName));
+      debugPrint('[NotificationService] Timezone set to: $timeZoneName');
+    } catch (e) {
+      debugPrint(
+        '[NotificationService] Failed to set local timezone, defaulting to UTC: $e',
+      );
+    }
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings(
@@ -60,27 +89,141 @@ class NotificationService {
 
   /// Request POST_NOTIFICATIONS permission (Android 13+).
   Future<bool> requestPermissions() async {
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    return await android?.requestNotificationsPermission() ?? false;
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
+    // On older Android versions this may return null because runtime
+    // notification permission is not required.
+    final notificationsGranted =
+        await android?.requestNotificationsPermission() ?? true;
+
+    // Exact alarms are needed because quote/streak schedules use
+    // AndroidScheduleMode.exactAllowWhileIdle when available.
+    var exactAlarmGranted = true;
+    if (android != null) {
+      try {
+        final canExact = await (android as dynamic)
+            .canScheduleExactNotifications();
+        if (canExact == false) {
+          exactAlarmGranted =
+              await (android as dynamic).requestExactAlarmsPermission() == true;
+        }
+      } catch (e) {
+        // Some plugin/platform combinations may not expose exact-alarm APIs.
+        debugPrint(
+          '[NotificationService] Exact alarm permission APIs unavailable: $e',
+        );
+      }
+    }
+
+    debugPrint(
+      '[NotificationService] Permission status '
+      '(notifications=$notificationsGranted, exactAlarms=$exactAlarmGranted)',
+    );
+    // Scheduling can still work with inexact mode when exact alarms are denied,
+    // so this return value reflects notification visibility permission only.
+    return notificationsGranted;
+  }
+
+  Future<AndroidScheduleMode> _resolveScheduleMode() async {
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
+    if (android == null) return AndroidScheduleMode.exactAllowWhileIdle;
+
+    try {
+      final canExact = await (android as dynamic)
+          .canScheduleExactNotifications();
+      if (canExact == false) {
+        debugPrint(
+          '[NotificationService] Exact alarms not permitted, using inexact scheduling.',
+        );
+        return AndroidScheduleMode.inexactAllowWhileIdle;
+      }
+    } catch (_) {
+      // If platform does not expose exact-alarm checks, keep existing behavior.
+    }
+
+    return AndroidScheduleMode.exactAllowWhileIdle;
+  }
+
+  Future<NotificationDiagnostics> getDiagnostics() async {
+    final pending = await _plugin.pendingNotificationRequests();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
+    bool? notificationsEnabled;
+    bool? canScheduleExact;
+
+    if (android != null) {
+      try {
+        notificationsEnabled = await (android as dynamic).areNotificationsEnabled();
+      } catch (_) {
+        notificationsEnabled = null;
+      }
+
+      try {
+        canScheduleExact = await (android as dynamic).canScheduleExactNotifications();
+      } catch (_) {
+        canScheduleExact = null;
+      }
+    }
+
+    final dailyQuotePendingCount = pending
+        .where((n) => n.id >= _dailyQuoteIdBase && n.id < _dailyQuoteIdBase + 7)
+        .length;
+    final scheduleMode = await _resolveScheduleMode();
+
+    final pendingSummary = pending
+        .map((n) {
+          final title = n.title ?? '(no title)';
+          return '#${n.id}: $title';
+        })
+        .toList(growable: false);
+
+    return NotificationDiagnostics(
+      notificationsEnabled: notificationsEnabled,
+      canScheduleExact: canScheduleExact,
+      scheduleMode: scheduleMode,
+      pendingCount: pending.length,
+      dailyQuotePendingCount: dailyQuotePendingCount,
+      pendingSummary: pendingSummary,
+    );
   }
 
   // Reschedule-on-Open
 
   /// Checks whether the quote-of-the-day queue is empty (e.g. after a reboot)
   /// and rebuilds it from the provided [quotes] and [streak] data.
+  /// Ensures the 7-day quote queue is full and streak reminders are current.
+  /// Called on app start in the splash screen.
   Future<void> syncScheduledNotifications({
     required List<Quote> quotes,
     required StreakData streak,
   }) async {
     final pending = await _plugin.pendingNotificationRequests();
-    final hasDailyQuotes = pending.any(
-      (n) => n.id >= _dailyQuoteIdBase && n.id < _dailyQuoteIdBase + 7,
-    );
+    final dailyQuotesCount = pending
+        .where((n) => n.id >= _dailyQuoteIdBase && n.id < _dailyQuoteIdBase + 7)
+        .length;
 
-    if (!hasDailyQuotes) {
-      debugPrint('[NotificationService] Sync: rescheduling daily quotes');
+    // If we have fewer than 7 days of quotes queued, top it up.
+    // We always redo the batch to ensure we have the next 7 days from *now*
+    // rather than waiting for the entire old batch to expire.
+    if (dailyQuotesCount < 7) {
+      debugPrint(
+        '[NotificationService] Sync: Refreshing 7-day quote queue ($dailyQuotesCount pending)',
+      );
       await scheduleDailyQuotes(quotes);
+    } else {
+      debugPrint(
+        '[NotificationService] Sync: Quote queue is full ($dailyQuotesCount pending)',
+      );
     }
 
     // Always refresh streak reminders on cold-start so they track the latest
@@ -93,32 +236,35 @@ class NotificationService {
   /// Schedules up to 7 days of quote notifications at 9 AM, using the user's
   /// filtered quote list. Cancels any previously scheduled batch first.
   Future<void> scheduleDailyQuotes(List<Quote> quotes) async {
-    // Cancel the old batch
+    // 1. Cancel the old batch to avoid duplicates
     for (var i = 0; i < 7; i++) {
       await _plugin.cancel(id: _dailyQuoteIdBase + i);
     }
-    if (quotes.isEmpty) return;
 
-    // Shuffle and pick up to 7
+    if (quotes.isEmpty) {
+      debugPrint(
+        '[NotificationService] Cancelled queue: No quotes match filters.',
+      );
+      return;
+    }
+
+    // 2. Shuffle and pick up to 7
     final pool = List<Quote>.from(quotes)..shuffle(Random());
     final count = pool.length < 7 ? pool.length : 7;
+    final scheduleMode = await _resolveScheduleMode();
 
     final now = tz.TZDateTime.now(tz.local);
 
+    // 3. Find the first available 9:00 AM slot (either today if < 9am, or tomorrow)
+    var firstSlot = tz.TZDateTime(tz.local, now.year, now.month, now.day, 15);
+    if (firstSlot.isBefore(now)) {
+      firstSlot = firstSlot.add(const Duration(days: 1));
+    }
+
+    // 4. Schedule the rolling window
     for (var i = 0; i < count; i++) {
       final quote = pool[i];
-      var scheduleDate = tz.TZDateTime(
-        tz.local,
-        now.year,
-        now.month,
-        now.day + i,
-        9, // 9:00 AM
-      );
-
-      // If it's already past 9 AM today, push the first slot to tomorrow
-      if (i == 0 && scheduleDate.isBefore(now)) {
-        scheduleDate = scheduleDate.add(const Duration(days: 1));
-      }
+      final scheduleDate = firstSlot.add(Duration(days: i));
 
       await _plugin.zonedSchedule(
         id: _dailyQuoteIdBase + i,
@@ -128,10 +274,16 @@ class NotificationService {
         notificationDetails: _quoteDetails(
           bigText: '"${quote.text}"\n\n— ${quote.author}',
         ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        androidScheduleMode: scheduleMode,
+      );
+
+      debugPrint(
+        '[NotificationService] Scheduled Day $i for ${scheduleDate.toString()}',
       );
     }
-    debugPrint('[NotificationService] Scheduled $count moments of wisdom');
+    debugPrint(
+      '[NotificationService] Success: $count moments of wisdom queued.',
+    );
   }
 
   // Streak Reminders
@@ -153,6 +305,7 @@ class NotificationService {
     final now = tz.TZDateTime.now(tz.local);
     final lastOpen = StreakData.dateOnly(streak.lastOpenedDate!);
     final streakCount = streak.currentStreak;
+    final scheduleMode = await _resolveScheduleMode();
 
     // 1. Safety reminder at 8 PM the next day
     //    e.g. opened Monday → reminder Tuesday 8 PM (4h before deadline)
@@ -171,7 +324,7 @@ class NotificationService {
         body: _getReminderBody(streakCount),
         scheduledDate: reminderTime,
         notificationDetails: _alertDetails(),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        androidScheduleMode: scheduleMode,
       );
     }
 
@@ -188,11 +341,12 @@ class NotificationService {
       await _plugin.zonedSchedule(
         id: _streakBreakId,
         title: 'The light has flickered out',
-        body: 'Your streak was lost to time yesterday. '
+        body:
+            'Your streak was lost to time yesterday. '
             'Relight the flame now to restore your progress.',
         scheduledDate: breakTime,
         notificationDetails: _alertDetails(),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        androidScheduleMode: scheduleMode,
       );
     }
 
@@ -268,7 +422,8 @@ class NotificationService {
     await _plugin.show(
       id: 997,
       title: 'The flame has gone out',
-      body: 'Your streak was lost to time yesterday. '
+      body:
+          'Your streak was lost to time yesterday. '
           'Relight the flame now to restore your progress.',
       notificationDetails: _alertDetails(),
     );

@@ -36,6 +36,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   late final Animation<double> _brandShimmerAnimation;
   late final Animation<Color?> _esyColorAnimation;
   late final Animation<double> _exitOpacity;
+  late final Future<bool> _notificationInitFuture;
 
   @override
   void initState() {
@@ -137,7 +138,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   void _initOtherServices() {
     unawaited(_safeInitRevenueCat());
-    unawaited(_safeInitNotifications());
+    _notificationInitFuture = _safeInitNotifications();
+    unawaited(_notificationInitFuture);
   }
 
   Future<void> _safeInitRevenueCat() async {
@@ -151,13 +153,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     }
   }
 
-  Future<void> _safeInitNotifications() async {
+  Future<bool> _safeInitNotifications() async {
     try {
       final notificationService = NotificationService();
       await notificationService.init();
-      await notificationService.requestPermissions();
+      return await notificationService.requestPermissions();
     } catch (error, stack) {
       debugPrint('Notification init failed (continuing): $error\n$stack');
+      return false;
     }
   }
 
@@ -166,10 +169,25 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       final db = ref.read(databaseServiceProvider);
       await refreshQuotesyHomeWidget(db);
 
-      final quotes = db.getFilteredFeed(
+      final notificationsReady = await _notificationInitFuture;
+      if (!notificationsReady) {
+        debugPrint(
+          'Post-handoff sync skipped notification scheduling: permissions not granted.',
+        );
+        return;
+      }
+
+      var quotes = db.getFilteredFeed(
         selectedCategories: db.getSelectedCategories(),
         selectedAuthors: db.getSelectedAuthors(),
       );
+
+      if (quotes.isEmpty) {
+        debugPrint(
+          'Filtered feed is empty at startup; using full quote library for daily scheduling.',
+        );
+        quotes = db.getAllQuotes();
+      }
 
       await NotificationService().syncScheduledNotifications(
         quotes: quotes,

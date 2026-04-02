@@ -72,9 +72,103 @@ class DebugNotificationsSheet extends StatelessWidget {
             icon: Icons.check_circle_outline,
             onTap: () => NotificationService().testStreakRestored(),
           ),
+          const SizedBox(height: 12),
+          _DebugButton(
+            label: 'Notification Diagnostics',
+            subtitle: 'Permission, exact alarm, pending queue',
+            icon: Icons.health_and_safety_outlined,
+            onTap: () => _showDiagnostics(context),
+          ),
           const SizedBox(height: 32),
         ],
       ),
+    );
+  }
+
+  Future<void> _showDiagnostics(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => const _DiagnosticsDialog(),
+    );
+  }
+}
+
+class _DiagnosticsDialog extends StatelessWidget {
+  const _DiagnosticsDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: QColors.surface,
+      title: const Text(
+        'Notification Diagnostics',
+        style: TextStyle(
+          fontFamily: 'Playfair Display',
+          color: QColors.textPrimary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      content: SizedBox(
+        width: 420,
+        child: FutureBuilder<NotificationDiagnostics>(
+          future: NotificationService().getDiagnostics(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              if (snapshot.hasError) {
+                return Text(
+                  'Failed to load diagnostics: ${snapshot.error}',
+                  style: const TextStyle(color: QColors.textGhost),
+                );
+              }
+              return const SizedBox(
+                height: 72,
+                child: Center(
+                  child: CircularProgressIndicator(color: QColors.amberGlow),
+                ),
+              );
+            }
+
+            final data = snapshot.data!;
+            final lines = <String>[
+              'Notifications enabled: ${data.notificationsEnabled ?? 'unknown'}',
+              'Can schedule exact alarms: ${data.canScheduleExact ?? 'unknown'}',
+              'Selected schedule mode: ${data.scheduleMode.name}',
+              'Total pending notifications: ${data.pendingCount}',
+              'Daily quote pending (IDs 100-106): ${data.dailyQuotePendingCount}',
+            ];
+
+            if (data.pendingSummary.isNotEmpty) {
+              lines.add('');
+              lines.add('Pending IDs:');
+              lines.addAll(data.pendingSummary.take(12));
+              if (data.pendingSummary.length > 12) {
+                lines.add('... ${data.pendingSummary.length - 12} more');
+              }
+            }
+
+            return SingleChildScrollView(
+              child: SelectableText(
+                lines.join('\n'),
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  height: 1.4,
+                  color: QColors.textPrimary,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text(
+            'Close',
+            style: TextStyle(color: QColors.amberGlow),
+          ),
+        ),
+      ],
     );
   }
 }
