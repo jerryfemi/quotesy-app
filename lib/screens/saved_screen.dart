@@ -9,10 +9,9 @@ import '../services/database_service.dart';
 import '../services/quote_share_service.dart';
 import '../theme/quotesy_theme.dart';
 
-
 class _FilterTab {
   final String label;
-  final String? category; 
+  final String? category;
   const _FilterTab(this.label, this.category);
 }
 
@@ -25,7 +24,6 @@ const _tabs = [
   _FilterTab('WIT & WISDOM', QuoteCategory.witAndWisdom),
   _FilterTab('FAITH', QuoteCategory.spiritualityAndFaith),
 ];
-
 
 class SavedScreen extends ConsumerStatefulWidget {
   const SavedScreen({super.key});
@@ -62,7 +60,7 @@ class _SavedScreenState extends ConsumerState<SavedScreen> {
                 // HEADER
                 SliverToBoxAdapter(child: _Header()),
 
-                // FILTER TABS 
+                // FILTER TABS
                 SliverPersistentHeader(
                   pinned: true,
                   delegate: _TabBarDelegate(
@@ -88,6 +86,9 @@ class _SavedScreenState extends ConsumerState<SavedScreen> {
                         key: ValueKey(filtered[i].id),
                         quote: filtered[i],
                         index: i,
+                        onToggleBookmark: (quoteId) => ref
+                            .read(savedQuotesProvider.notifier)
+                            .toggle(quoteId),
                       ),
                     ),
                   ),
@@ -223,14 +224,20 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
 // ─────────────────────────────────────────────────────────────────────────────
 // _SavedQuoteCard
 // ─────────────────────────────────────────────────────────────────────────────
-class _SavedQuoteCard extends ConsumerWidget {
+class _SavedQuoteCard extends StatelessWidget {
   final Quote quote;
   final int index;
+  final Future<void> Function(String quoteId) onToggleBookmark;
 
-  const _SavedQuoteCard({super.key, required this.quote, required this.index});
+  const _SavedQuoteCard({
+    super.key,
+    required this.quote,
+    required this.index,
+    required this.onToggleBookmark,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return GestureDetector(
@@ -300,9 +307,7 @@ class _SavedQuoteCard extends ConsumerWidget {
                       top: 16,
                       right: 16,
                       child: GestureDetector(
-                        onTap: () => ref
-                            .read(savedQuotesProvider.notifier)
-                            .toggle(quote.id),
+                        onTap: () => onToggleBookmark(quote.id),
                         behavior: HitTestBehavior.opaque,
                         child: const Icon(
                           Icons.bookmarks_rounded,
@@ -332,7 +337,10 @@ class _SavedQuoteCard extends ConsumerWidget {
         opaque: false,
         barrierColor: Colors.black87,
         barrierDismissible: true,
-        pageBuilder: (_, _, _) => _QuoteDetailScreen(quote: quote),
+        pageBuilder: (_, _, _) => _QuoteDetailScreen(
+          quote: quote,
+          onToggleBookmark: onToggleBookmark,
+        ),
         transitionsBuilder: (_, animation, _, child) {
           return FadeTransition(
             opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
@@ -349,12 +357,17 @@ class _SavedQuoteCard extends ConsumerWidget {
 // Full-screen quote view — same layout as HomeScreen quote card.
 // Tap anywhere or swipe down to dismiss.
 // ─────────────────────────────────────────────────────────────────────────────
-class _QuoteDetailScreen extends ConsumerWidget {
+class _QuoteDetailScreen extends StatelessWidget {
   final Quote quote;
-  const _QuoteDetailScreen({required this.quote});
+  final Future<void> Function(String quoteId) onToggleBookmark;
+
+  const _QuoteDetailScreen({
+    required this.quote,
+    required this.onToggleBookmark,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return GestureDetector(
@@ -413,9 +426,11 @@ class _QuoteDetailScreen extends ConsumerWidget {
               child: Row(
                 children: [
                   GestureDetector(
-                    onTap: () {
-                      ref.read(savedQuotesProvider.notifier).toggle(quote.id);
-                      context.pop();
+                    onTap: () async {
+                      await onToggleBookmark(quote.id);
+                      if (context.mounted) {
+                        context.pop();
+                      }
                     },
                     behavior: HitTestBehavior.opaque,
                     child: const Icon(

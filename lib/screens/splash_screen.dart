@@ -1,11 +1,15 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
+import '../models/streak_model.dart';
 import '../providers/database_provider.dart';
 import '../services/home_widget_service.dart';
+import '../services/notification_service.dart';
 import '../theme/quotesy_theme.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -16,7 +20,7 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen>
-  with TickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const _animationDuration = Duration(milliseconds: 1500);
   static const _minimumVisibleDuration = Duration(milliseconds: 1800);
   static const _handoffFadeDuration = Duration(milliseconds: 260);
@@ -77,22 +81,55 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _runStartupFlow() async {
-    final initFuture = ref.read(databaseInitProvider.future);
+    // 1. Parallelize initializations with the logo animation
+    final initDB = ref.read(databaseInitProvider.future);
+    final initOther = _initOtherServices();
 
     await Future.wait([
       _controller.forward(),
-      initFuture,
+      initDB,
+      initOther,
       Future<void>.delayed(_minimumVisibleDuration),
     ]);
 
     if (!mounted) return;
 
+    // 2. Refresh widget and prepare notification sync inputs.
     final db = ref.read(databaseServiceProvider);
     unawaited(refreshQuotesyHomeWidget(db));
 
+    // Prepare sync inputs before navigation to avoid re-reading providers after handoff.
+    final quotes = db.getFilteredFeed(
+      selectedCategories: db.getSelectedCategories(),
+      selectedAuthors: db.getSelectedAuthors(),
+    );
+    final streak = ref.read(streakProvider);
+
+    // 3. Finalize splash and hand off to Home.
     await _exitController.forward();
     if (!mounted) return;
     context.go('/home');
+
+    // Keep startup snappy: sync notifications in background after navigation.
+    unawaited(
+      NotificationService().syncScheduledNotifications(
+        quotes: quotes,
+        streak: streak,
+      ),
+    );
+  }
+
+  Future<void> _initOtherServices() async {
+    // RevenueCat - configured for production speed
+    await Purchases.setLogLevel(kDebugMode ? LogLevel.debug : LogLevel.error);
+    await Purchases.configure(
+      PurchasesConfiguration('goog_xrjdqrwqgLqwUvrGwcDUnxBBHKP'),
+    );
+
+    // Notifications - wakeup engine and verify permissions
+    final notificationService = NotificationService();
+    await notificationService.init();
+    await notificationService.requestPermissions();
   }
 
   @override

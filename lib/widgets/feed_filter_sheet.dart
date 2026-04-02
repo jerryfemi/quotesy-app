@@ -29,7 +29,7 @@ Future<void> showFeedFilterSheet(BuildContext context, WidgetRef ref) async {
 
     // Reschedule daily quotes to reflect updated filter preferences.
     final db = ref.read(databaseServiceProvider);
-    final quotes = await db.getFilteredFeed(
+    final quotes = db.getFilteredFeed(
       selectedCategories: db.getSelectedCategories(),
       selectedAuthors: db.getSelectedAuthors(),
     );
@@ -52,19 +52,6 @@ class _FeedFilterSheetState extends ConsumerState<FeedFilterSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final topAuthorsByCategory = <String, List<String>>{};
-    final loadingCategories = <String>{};
-    for (final category in QuoteCategory.all) {
-      final asyncAuthors = ref.watch(topAuthorsByCategoryProvider(category));
-      topAuthorsByCategory[category] = asyncAuthors.maybeWhen(
-        data: (value) => value,
-        orElse: () => const <String>[],
-      );
-      if (asyncAuthors.isLoading) {
-        loadingCategories.add(category);
-      }
-    }
-
     final prefsState = ref
         .watch(feedPreferencesProvider)
         .maybeWhen(
@@ -143,122 +130,32 @@ class _FeedFilterSheetState extends ConsumerState<FeedFilterSheet> {
                   itemCount: QuoteCategory.all.length,
                   itemBuilder: (context, index) {
                     final category = QuoteCategory.all[index];
-                    final isSelected = prefsState.selectedCategories.contains(
-                      category,
-                    );
                     final isExpanded = _expandedCategories.contains(category);
                     final count = categoryCounts[category] ?? 0;
-                    final topAuthors =
-                        topAuthorsByCategory[category] ?? const <String>[];
-                    final authorsLoading = loadingCategories.contains(category);
-
-                    final selectedSubset = prefsState.selectedAuthors[category];
-                    final selectedAuthors = !isSelected
-                        ? <String>{}
-                        : (selectedSubset == null
-                              ? topAuthors.toSet()
-                              : selectedSubset.toSet());
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 10),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeOut,
-                        padding: const EdgeInsets.fromLTRB(10, 4, 8, 6),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? Colors.white.withValues(alpha: 0.03)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected
-                                ? Colors.white.withValues(alpha: 0.10)
-                                : Colors.white.withValues(alpha: 0.04),
-                            width: 1,
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            _CategoryRow(
-                              category: category,
-                              quoteCount: count,
-                              isSelected: isSelected,
-                              isExpanded: isExpanded,
-                              onToggleCategory: () =>
-                                  _toggleCategory(prefsState, category),
-                              onToggleExpanded: () {
-                                setState(() {
-                                  if (isExpanded) {
-                                    _expandedCategories.remove(category);
-                                  } else {
-                                    _expandedCategories.add(category);
-                                  }
-                                });
-                              },
-                            ),
-                            AnimatedSize(
-                              duration: const Duration(milliseconds: 220),
-                              curve: Curves.easeOutCubic,
-                              alignment: Alignment.topCenter,
-                              child: isExpanded
-                                  ? Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        34,
-                                        6,
-                                        0,
-                                        2,
-                                      ),
-                                      child: authorsLoading
-                                          ? const Padding(
-                                              padding: EdgeInsets.symmetric(
-                                                vertical: 10,
-                                              ),
-                                              child: SizedBox(
-                                                width: 18,
-                                                height: 18,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                      color: QColors.textSubtle,
-                                                    ),
-                                              ),
-                                            )
-                                          : topAuthors.isEmpty
-                                          ? const Padding(
-                                              padding: EdgeInsets.only(
-                                                bottom: 10,
-                                              ),
-                                              child: Text(
-                                                'No high-frequency authors in this category yet.',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: QColors.textSubtle,
-                                                ),
-                                              ),
-                                            )
-                                          : Column(
-                                              children: topAuthors
-                                                  .map(
-                                                    (author) => _AuthorRow(
-                                                      author: author,
-                                                      isSelected:
-                                                          selectedAuthors
-                                                              .contains(author),
-                                                      onToggle: () =>
-                                                          _toggleAuthor(
-                                                            prefsState,
-                                                            category,
-                                                            topAuthors,
-                                                            author,
-                                                          ),
-                                                    ),
-                                                  )
-                                                  .toList(growable: false),
-                                            ),
-                                    )
-                                  : const SizedBox.shrink(),
-                            ),
-                          ],
+                      child: _CategoryFilterTile(
+                        category: category,
+                        quoteCount: count,
+                        prefsState: prefsState,
+                        isExpanded: isExpanded,
+                        onToggleCategory: () =>
+                            _toggleCategory(prefsState, category),
+                        onToggleExpanded: () {
+                          setState(() {
+                            if (isExpanded) {
+                              _expandedCategories.remove(category);
+                            } else {
+                              _expandedCategories.add(category);
+                            }
+                          });
+                        },
+                        onToggleAuthor: (topAuthors, author) => _toggleAuthor(
+                          prefsState,
+                          category,
+                          topAuthors,
+                          author,
                         ),
                       ),
                     );
@@ -341,6 +238,119 @@ class _FeedFilterSheetState extends ConsumerState<FeedFilterSheet> {
           selectedCategories: categories.toList(growable: false),
           selectedAuthors: selectedAuthors,
         );
+  }
+}
+
+class _CategoryFilterTile extends ConsumerWidget {
+  const _CategoryFilterTile({
+    required this.category,
+    required this.quoteCount,
+    required this.prefsState,
+    required this.isExpanded,
+    required this.onToggleCategory,
+    required this.onToggleExpanded,
+    required this.onToggleAuthor,
+  });
+
+  final String category;
+  final int quoteCount;
+  final FeedPreferencesState prefsState;
+  final bool isExpanded;
+  final VoidCallback onToggleCategory;
+  final VoidCallback onToggleExpanded;
+  final void Function(List<String> topAuthors, String author) onToggleAuthor;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isSelected = prefsState.selectedCategories.contains(category);
+    final asyncAuthors = ref.watch(topAuthorsByCategoryProvider(category));
+    final topAuthors = asyncAuthors.maybeWhen(
+      data: (value) => value,
+      orElse: () => const <String>[],
+    );
+    final selectedSubset = prefsState.selectedAuthors[category];
+    final selectedAuthors = !isSelected
+        ? <String>{}
+        : (selectedSubset == null
+              ? topAuthors.toSet()
+              : selectedSubset.toSet());
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: const EdgeInsets.fromLTRB(10, 4, 8, 6),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? Colors.white.withValues(alpha: 0.03)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected
+              ? Colors.white.withValues(alpha: 0.10)
+              : Colors.white.withValues(alpha: 0.04),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          _CategoryRow(
+            category: category,
+            quoteCount: quoteCount,
+            isSelected: isSelected,
+            isExpanded: isExpanded,
+            onToggleCategory: onToggleCategory,
+            onToggleExpanded: onToggleExpanded,
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: isExpanded
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(34, 6, 0, 2),
+                    child: asyncAuthors.isLoading
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 10),
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: QColors.textSubtle,
+                              ),
+                            ),
+                          )
+                        : topAuthors.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.only(bottom: 10),
+                            child: Text(
+                              'No high-frequency authors in this category yet.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: QColors.textSubtle,
+                              ),
+                            ),
+                          )
+                        : Column(
+                            children: topAuthors
+                                .map(
+                                  (author) => _AuthorRow(
+                                    author: author,
+                                    isSelected: selectedAuthors.contains(
+                                      author,
+                                    ),
+                                    onToggle: () =>
+                                        onToggleAuthor(topAuthors, author),
+                                  ),
+                                )
+                                .toList(growable: false),
+                          ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
   }
 }
 

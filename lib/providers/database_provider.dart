@@ -169,10 +169,7 @@ final feedPreferencesProvider =
 /// Filtered feed for Home. Uses persisted feed preferences.
 final filteredFeedProvider = FutureProvider<List<Quote>>((ref) async {
   await ref.watch(databaseInitProvider.future);
-  final prefs = ref.watch(feedPreferencesProvider).maybeWhen(
-    data: (value) => value,
-    orElse: () => FeedPreferencesState.empty,
-  );
+  final prefs = await ref.watch(feedPreferencesProvider.future);
 
   final service = ref.read(databaseServiceProvider);
   return service.getFilteredFeed(

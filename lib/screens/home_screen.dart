@@ -162,13 +162,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final quotes = ref
         .watch(filteredFeedProvider)
         .maybeWhen(data: (value) => value, orElse: () => <Quote>[]);
-    final feedPrefs = ref
-        .watch(feedPreferencesProvider)
-        .maybeWhen(
-          data: (value) => value,
-          orElse: () => FeedPreferencesState.empty,
-        );
-
     final nav = NavBarControllerScope.of(context);
     final topPad = MediaQuery.of(context).padding.top;
 
@@ -205,95 +198,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
 
-        Positioned(top: topPad + 12, left: 20, child:  _StreakIndicator(() => _openStreak(),)),
+        Positioned(
+          top: topPad + 12,
+          left: 20,
+          child: _StreakIndicator(() => _openStreak()),
+        ),
 
         Positioned(
           top: topPad + 8,
           right: 16,
-          child: Semantics(
-            label: feedPrefs.hasActiveFilters
-                ? 'Filters active'
-                : 'Open feed filters',
-            button: true,
-            child: GestureDetector(
-              onTap: _openFilters,
-              behavior: HitTestBehavior.opaque,
-              child: SizedBox(
-                width: 38,
-                height: 38,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Center(
-                      child: Icon(
-                        Icons.tune_rounded,
-                        size: 22,
-                        color: currentQuote != null
-                            ? QColors.textSubtle
-                            : QColors.textGhost,
-                      ),
-                    ),
-                    if (feedPrefs.hasActiveFilters)
-                      Positioned(
-                        right: 5,
-                        top: 5,
-                        child: Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            color: QColors.amberGlow,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
+          child: _FeedFilterButton(
+            onTap: _openFilters,
+            hasCurrentQuote: currentQuote != null,
           ),
         ),
 
-        if (feedPrefs.hasActiveFilters && quotes.length < _narrowFeedThreshold)
-          Positioned(
-            left: 20,
-            right: 20,
-            bottom: 90,
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.12),
-                    width: 1,
-                  ),
-                ),
-                child: const Padding(
-                  padding: EdgeInsets.fromLTRB(14, 10, 14, 11),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.filter_alt_outlined,
-                        size: 14,
-                        color: QColors.textSubtle,
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Your feed is short. Add a category or author to broaden it.',
-                          style: TextStyle(
-                            color: QColors.textSubtle,
-                            fontSize: 12,
-                            height: 1.3,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+        _NarrowFeedHint(quoteCount: quotes.length),
 
         if (_showGhostHint)
           Positioned(
@@ -320,6 +240,128 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _FeedFilterButton extends ConsumerWidget {
+  const _FeedFilterButton({required this.onTap, required this.hasCurrentQuote});
+
+  final VoidCallback onTap;
+  final bool hasCurrentQuote;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasActiveFilters = ref.watch(
+      feedPreferencesProvider.select(
+        (value) => value.maybeWhen(
+          data: (prefs) => prefs.hasActiveFilters,
+          orElse: () => false,
+        ),
+      ),
+    );
+
+    return Semantics(
+      label: hasActiveFilters ? 'Filters active' : 'Open feed filters',
+      button: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: 38,
+          height: 38,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Center(
+                child: Icon(
+                  Icons.tune_rounded,
+                  size: 22,
+                  color: hasCurrentQuote
+                      ? QColors.textSubtle
+                      : QColors.textGhost,
+                ),
+              ),
+              if (hasActiveFilters)
+                Positioned(
+                  right: 5,
+                  top: 5,
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: QColors.amberGlow,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NarrowFeedHint extends ConsumerWidget {
+  const _NarrowFeedHint({required this.quoteCount});
+
+  final int quoteCount;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasActiveFilters = ref.watch(
+      feedPreferencesProvider.select(
+        (value) => value.maybeWhen(
+          data: (prefs) => prefs.hasActiveFilters,
+          orElse: () => false,
+        ),
+      ),
+    );
+    if (!hasActiveFilters ||
+        quoteCount >= _HomeScreenState._narrowFeedThreshold) {
+      return const SizedBox.shrink();
+    }
+
+    return Positioned(
+      left: 20,
+      right: 20,
+      bottom: 90,
+      child: IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.12),
+              width: 1,
+            ),
+          ),
+          child: const Padding(
+            padding: EdgeInsets.fromLTRB(14, 10, 14, 11),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.filter_alt_outlined,
+                  size: 14,
+                  color: QColors.textSubtle,
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Your feed is short. Add a category or author to broaden it.',
+                    style: TextStyle(
+                      color: QColors.textSubtle,
+                      fontSize: 12,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
