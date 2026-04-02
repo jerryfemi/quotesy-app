@@ -49,7 +49,7 @@ class StreakPreviewPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: isAfter
             ? QColors.amberSubtle
-            : Colors.white.withValues(alpha: 0.06),
+            : QColors.textPrimary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -89,7 +89,10 @@ class StreakSheetDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(height: 1, color: Colors.white.withValues(alpha: 0.06));
+    return Container(
+      height: 1,
+      color: QColors.textPrimary.withValues(alpha: 0.06),
+    );
   }
 }
 

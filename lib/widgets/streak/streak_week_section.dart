@@ -180,7 +180,7 @@ class _ChevronButton extends StatelessWidget {
           size: 18,
           color: enabled
               ? QColors.textSubtle
-              : Colors.white.withValues(alpha: 0.08),
+              : QColors.textPrimary.withValues(alpha: 0.08),
         ),
       ),
     );
@@ -366,7 +366,7 @@ class _DotWidget extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.18),
+              color: QColors.textPrimary.withValues(alpha: 0.18),
               width: 1.5,
             ),
           ),

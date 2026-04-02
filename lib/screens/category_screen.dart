@@ -128,7 +128,7 @@ class _CategoryAppBar extends StatelessWidget implements PreferredSizeWidget {
           padding: EdgeInsets.only(left: 4),
           child: Icon(
             Icons.chevron_left_rounded,
-            color: Colors.white70,
+            color: QColors.textMuted,
             size: 28,
           ),
         ),
@@ -142,7 +142,7 @@ class _CategoryAppBar extends StatelessWidget implements PreferredSizeWidget {
               fontFamily: 'Playfair Display',
               fontSize: 17,
               fontWeight: FontWeight.w600,
-              color: Colors.white,
+              color: QColors.textPrimary,
               letterSpacing: 0.3,
             ),
           ),

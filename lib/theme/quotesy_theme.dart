@@ -38,6 +38,24 @@ class QColors {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// QNavColors — centralized nav bar palette
+// Change these in one place to re-theme the bottom nav.
+// ─────────────────────────────────────────────────────────────────────────────
+class QNavColors {
+  QNavColors._();
+
+  static const shellBackground = QColors.obsidian;
+  static const pillBackground = QColors.surface;
+  static const pillBorder = QColors.borderSubtle;
+
+  static const accent = QColors.amber;
+  static const accentGlow = QColors.amberGlow;
+  static const inactive = QColors.textSubtle;
+
+  static const detachedShadow = Color(0x8C000000);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // darkMode — the single ThemeData instance for the whole app.
 // ─────────────────────────────────────────────────────────────────────────────
 final ThemeData darkMode = () {

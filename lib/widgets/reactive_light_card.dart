@@ -60,7 +60,7 @@ class ReactiveLightCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           color: QColors.cardBase,
           border: Border.all(
-            color: Colors.white.withValues(alpha: rimAlpha),
+            color: QColors.textPrimary.withValues(alpha: rimAlpha),
             width: 1.0,
           ),
         ),
@@ -99,7 +99,7 @@ class ReactiveLightCard extends StatelessWidget {
                       style: theme.textTheme.labelSmall?.copyWith(
                         fontFamily: 'Playfair Display',
                         letterSpacing: 1.6,
-                        color: Colors.white.withValues(
+                        color: QColors.textPrimary.withValues(
                           alpha: 0.30 + (0.35 * glowFocus),
                         ),
                       ),
@@ -111,7 +111,7 @@ class ReactiveLightCard extends StatelessWidget {
                     Text(
                       style.displayTitle,
                       style: theme.textTheme.headlineMedium?.copyWith(
-                        color: Colors.white.withValues(
+                        color: QColors.textPrimary.withValues(
                           alpha: 0.55 + (0.45 * glowFocus),
                         ),
                       ),

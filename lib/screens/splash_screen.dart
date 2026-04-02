@@ -27,9 +27,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   late final AnimationController _controller;
   late final AnimationController _exitController;
-  late final Animation<Offset> _dropAnimation;
+  late final Animation<double> _iconScaleAnimation;
+  late final Animation<double> _iconTiltAnimation;
+  late final Animation<double> _ambientPulseAnimation;
   late final Animation<double> _iconFadeAnimation;
   late final Animation<double> _brandFadeAnimation;
+  late final Animation<Offset> _brandSlideAnimation;
+  late final Animation<double> _brandShimmerAnimation;
   late final Animation<Color?> _esyColorAnimation;
   late final Animation<double> _exitOpacity;
 
@@ -50,10 +54,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       CurvedAnimation(parent: _exitController, curve: Curves.easeOutCubic),
     );
 
-    _dropAnimation = Tween<Offset>(
-      begin: const Offset(0, -0.30),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutQuart));
+    _ambientPulseAnimation = Tween<double>(begin: 0.82, end: 1.08).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 1.0, curve: Curves.easeInOutSine),
+      ),
+    );
+
+    _iconScaleAnimation = Tween<double>(begin: 0.76, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.58, curve: Curves.easeOutBack),
+      ),
+    );
+
+    _iconTiltAnimation = Tween<double>(begin: -0.10, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.52, curve: Curves.easeOutCubic),
+      ),
+    );
 
     _iconFadeAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
@@ -69,7 +89,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       ),
     );
 
-    _esyColorAnimation = ColorTween(begin: Colors.white, end: QColors.amberGlow)
+    _brandSlideAnimation =
+        Tween<Offset>(begin: const Offset(0.0, 0.10), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.22, 0.80, curve: Curves.easeOutCubic),
+          ),
+        );
+
+    _brandShimmerAnimation = Tween<double>(begin: -1.3, end: 1.3).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.40, 0.98, curve: Curves.easeInOut),
+      ),
+    );
+
+    _esyColorAnimation = ColorTween(begin: QColors.textPrimary, end: QColors.amberGlow)
         .animate(
           CurvedAnimation(
             parent: _controller,
@@ -81,55 +116,68 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _runStartupFlow() async {
-    // 1. Parallelize initializations with the logo animation
     final initDB = ref.read(databaseInitProvider.future);
-    final initOther = _initOtherServices();
+    _initOtherServices();
 
     await Future.wait([
       _controller.forward(),
       initDB,
-      initOther,
       Future<void>.delayed(_minimumVisibleDuration),
     ]);
 
     if (!mounted) return;
+    final streak = ref.read(streakProvider.notifier).reconcileOnAppOpen();
 
-    // 2. Refresh widget and prepare notification sync inputs.
-    final db = ref.read(databaseServiceProvider);
-    unawaited(refreshQuotesyHomeWidget(db));
-
-    // Prepare sync inputs before navigation to avoid re-reading providers after handoff.
-    final quotes = db.getFilteredFeed(
-      selectedCategories: db.getSelectedCategories(),
-      selectedAuthors: db.getSelectedAuthors(),
-    );
-    final streak = ref.read(streakProvider);
-
-    // 3. Finalize splash and hand off to Home.
     await _exitController.forward();
     if (!mounted) return;
     context.go('/home');
 
-    // Keep startup snappy: sync notifications in background after navigation.
-    unawaited(
-      NotificationService().syncScheduledNotifications(
-        quotes: quotes,
-        streak: streak,
-      ),
-    );
+    unawaited(_runPostHandoffSync(streak));
   }
 
-  Future<void> _initOtherServices() async {
-    // RevenueCat - configured for production speed
-    await Purchases.setLogLevel(kDebugMode ? LogLevel.debug : LogLevel.error);
-    await Purchases.configure(
-      PurchasesConfiguration('goog_xrjdqrwqgLqwUvrGwcDUnxBBHKP'),
-    );
+  void _initOtherServices() {
+    unawaited(_safeInitRevenueCat());
+    unawaited(_safeInitNotifications());
+  }
 
-    // Notifications - wakeup engine and verify permissions
-    final notificationService = NotificationService();
-    await notificationService.init();
-    await notificationService.requestPermissions();
+  Future<void> _safeInitRevenueCat() async {
+    try {
+      await Purchases.setLogLevel(kDebugMode ? LogLevel.debug : LogLevel.error);
+      await Purchases.configure(
+        PurchasesConfiguration('goog_xrjdqrwqgLqwUvrGwcDUnxBBHKP'),
+      );
+    } catch (error, stack) {
+      debugPrint('RevenueCat init failed (continuing): $error\n$stack');
+    }
+  }
+
+  Future<void> _safeInitNotifications() async {
+    try {
+      final notificationService = NotificationService();
+      await notificationService.init();
+      await notificationService.requestPermissions();
+    } catch (error, stack) {
+      debugPrint('Notification init failed (continuing): $error\n$stack');
+    }
+  }
+
+  Future<void> _runPostHandoffSync(StreakData streak) async {
+    try {
+      final db = ref.read(databaseServiceProvider);
+      await refreshQuotesyHomeWidget(db);
+
+      final quotes = db.getFilteredFeed(
+        selectedCategories: db.getSelectedCategories(),
+        selectedAuthors: db.getSelectedAuthors(),
+      );
+
+      await NotificationService().syncScheduledNotifications(
+        quotes: quotes,
+        streak: streak,
+      );
+    } catch (error, stack) {
+      debugPrint('Post-handoff sync failed (continuing): $error\n$stack');
+    }
   }
 
   @override
@@ -147,29 +195,47 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         opacity: _exitOpacity,
         child: Stack(
           children: [
-            const Positioned.fill(child: _SplashBackdrop()),
+            Positioned.fill(
+              child: _SplashBackdrop(ambientPulse: _ambientPulseAnimation),
+            ),
             Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  SlideTransition(
-                    position: _dropAnimation,
-                    child: FadeTransition(
-                      opacity: _iconFadeAnimation,
+                  FadeTransition(
+                    opacity: _iconFadeAnimation,
+                    child: AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        return Transform.rotate(
+                          angle: _iconTiltAnimation.value,
+                          child: Transform.scale(
+                            scale: _iconScaleAnimation.value,
+                            child: child,
+                          ),
+                        );
+                      },
                       child: Container(
                         width: 132,
                         height: 132,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(10),
+                          color: QColors.textPrimary.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.08),
+                            color: QColors.textPrimary.withValues(alpha: 0.10),
                             width: 1,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: QColors.amberGlow.withValues(alpha: 0.12),
+                              blurRadius: 24,
+                              spreadRadius: -6,
+                            ),
+                          ],
                         ),
                         child: const Icon(
                           Icons.menu_book_rounded,
-                          color: Colors.white70,
+                          color: QColors.textMuted,
                           size: 56,
                         ),
                       ),
@@ -178,33 +244,66 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   const SizedBox(height: 34),
                   FadeTransition(
                     opacity: _brandFadeAnimation,
-                    child: AnimatedBuilder(
-                      animation: _esyColorAnimation,
-                      builder: (context, _) {
-                        return RichText(
-                          text: TextSpan(
-                            style: const TextStyle(
-                              fontFamily: 'Playfair Display',
-                              fontSize: 62,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.2,
-                              height: 0.9,
-                            ),
+                    child: SlideTransition(
+                      position: _brandSlideAnimation,
+                      child: AnimatedBuilder(
+                        animation: _controller,
+                        builder: (context, _) {
+                          return Stack(
+                            alignment: Alignment.center,
                             children: [
-                              const TextSpan(
-                                text: 'QUOT',
-                                style: TextStyle(color: Colors.white),
+                              RichText(
+                                text: TextSpan(
+                                  style: const TextStyle(
+                                    fontFamily: 'Playfair Display',
+                                    fontSize: 62,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1.2,
+                                    height: 0.9,
+                                  ),
+                                  children: [
+                                    const TextSpan(
+                                      text: 'QUOT',
+                                      style: TextStyle(color: QColors.textPrimary),
+                                    ),
+                                    TextSpan(
+                                      text: 'ESY',
+                                      style: TextStyle(
+                                        color: _esyColorAnimation.value,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              TextSpan(
-                                text: 'ESY',
-                                style: TextStyle(
-                                  color: _esyColorAnimation.value,
+                              IgnorePointer(
+                                child: FractionalTranslation(
+                                  translation: Offset(
+                                    _brandShimmerAnimation.value,
+                                    0,
+                                  ),
+                                  child: Container(
+                                    width: 120,
+                                    height: 80,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.centerLeft,
+                                        end: Alignment.centerRight,
+                                        colors: [
+                                          Colors.transparent,
+                                          QColors.amberGlow.withValues(
+                                            alpha: 0.08,
+                                          ),
+                                          Colors.transparent,
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -213,7 +312,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     child: Container(
                       width: 54,
                       height: 2,
-                      color: Colors.white.withValues(alpha: 0.10),
+                      color: QColors.textPrimary.withValues(alpha: 0.10),
                     ),
                   ),
                 ],
@@ -227,46 +326,59 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 }
 
 class _SplashBackdrop extends StatelessWidget {
-  const _SplashBackdrop();
+  const _SplashBackdrop({required this.ambientPulse});
+
+  final Animation<double> ambientPulse;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF13191D), QColors.obsidian],
-          stops: [0.0, 0.6],
-        ),
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Align(
-            alignment: const Alignment(0.85, -0.72),
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.03),
-              ),
+    return AnimatedBuilder(
+      animation: ambientPulse,
+      builder: (context, _) {
+        return DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [QColors.surface, QColors.obsidian],
+              stops: [0.0, 0.6],
             ),
           ),
-          Align(
-            alignment: const Alignment(-0.9, 0.88),
-            child: Container(
-              width: 320,
-              height: 320,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.02),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Align(
+                alignment: const Alignment(0.85, -0.72),
+                child: Transform.scale(
+                  scale: ambientPulse.value,
+                  child: Container(
+                    width: 180,
+                    height: 180,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: QColors.textPrimary.withValues(alpha: 0.03),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              Align(
+                alignment: const Alignment(-0.9, 0.88),
+                child: Transform.scale(
+                  scale: 2.0 - ambientPulse.value,
+                  child: Container(
+                    width: 320,
+                    height: 320,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: QColors.textPrimary.withValues(alpha: 0.02),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 import '../providers/database_provider.dart';
 import '../services/notification_service.dart';
@@ -81,13 +84,7 @@ class StreakNotifier extends Notifier<StreakData> {
 
   Box get _box => Hive.box(_boxName);
 
-  @override
-  StreakData build() {
-    final initState = ref.watch(databaseInitProvider);
-    if (initState.isLoading || initState.hasError) {
-      return const StreakData();
-    }
-
+  StreakData _readStoredState() {
     final current = _box.get(_currentKey, defaultValue: 0) as int;
     final best = _box.get(_bestKey, defaultValue: 0) as int;
     final lastRaw = _box.get(_lastOpenedKey) as String?;
@@ -96,13 +93,56 @@ class StreakNotifier extends Notifier<StreakData> {
     final brokenRaw = _box.get(_brokenFromKey) as String?;
     final brokenFrom = brokenRaw != null ? DateTime.tryParse(brokenRaw) : null;
 
-    return _calculateStreak(
-      current: current,
-      best: best,
-      lastOpened: lastOpened,
-      previous: previous,
-      brokenFrom: brokenFrom,
+    return StreakData(
+      currentStreak: current,
+      bestStreak: best,
+      lastOpenedDate: lastOpened,
+      previousStreak: previous,
+      brokenFromDate: brokenFrom,
     );
+  }
+
+  @override
+  StreakData build() {
+    final initState = ref.watch(databaseInitProvider);
+    if (initState.isLoading || initState.hasError) {
+      return const StreakData();
+    }
+
+    // Keep build pure: hydrate persisted state only.
+    return _readStoredState();
+  }
+
+  StreakData reconcileOnAppOpen() {
+    final initState = ref.read(databaseInitProvider);
+    if (initState.isLoading || initState.hasError) {
+      // Safe no-op until DB initialization settles.
+      return state;
+    }
+
+    final stored = _readStoredState();
+    final next = _calculateStreak(
+      current: stored.currentStreak,
+      best: stored.bestStreak,
+      lastOpened: stored.lastOpenedDate,
+      previous: stored.previousStreak,
+      brokenFrom: stored.brokenFromDate,
+    );
+
+    final shouldPersist =
+        next.currentStreak != stored.currentStreak ||
+        next.bestStreak != stored.bestStreak ||
+        next.lastOpenedDate != stored.lastOpenedDate ||
+        next.previousStreak != stored.previousStreak ||
+        next.brokenFromDate != stored.brokenFromDate;
+
+    if (shouldPersist) {
+      state = _save(next);
+    } else {
+      state = next;
+    }
+
+    return state;
   }
 
   StreakData _calculateStreak({
@@ -116,9 +156,7 @@ class StreakNotifier extends Notifier<StreakData> {
 
     if (lastOpened == null) {
       // First ever open
-      return _save(
-        StreakData(currentStreak: 1, bestStreak: 1, lastOpenedDate: today),
-      );
+      return StreakData(currentStreak: 1, bestStreak: 1, lastOpenedDate: today);
     }
 
     final last = StreakData.dateOnly(lastOpened);
@@ -139,25 +177,21 @@ class StreakNotifier extends Notifier<StreakData> {
       // Consecutive day — increment, clear any broken state
       final newCurrent = current + 1;
       final newBest = newCurrent > best ? newCurrent : best;
-      return _save(
-        StreakData(
-          currentStreak: newCurrent,
-          bestStreak: newBest,
-          lastOpenedDate: today,
-        ),
+      return StreakData(
+        currentStreak: newCurrent,
+        bestStreak: newBest,
+        lastOpenedDate: today,
       );
     }
 
     // Streak broken (1+ days missed) — save broken state for potential restore.
     // The restore window stays open until the user builds a new streak (day 2).
-    return _save(
-      StreakData(
-        currentStreak: 1,
-        bestStreak: best,
-        lastOpenedDate: today,
-        previousStreak: current,
-        brokenFromDate: last,
-      ),
+    return StreakData(
+      currentStreak: 1,
+      bestStreak: best,
+      lastOpenedDate: today,
+      previousStreak: current,
+      brokenFromDate: last,
     );
   }
 
@@ -227,7 +261,13 @@ class StreakNotifier extends Notifier<StreakData> {
     });
 
     // Reschedule streak reminders based on the freshly-saved state.
-    NotificationService().scheduleStreakReminders(data);
+    unawaited(
+      Future<void>.sync(
+        () => NotificationService().scheduleStreakReminders(data),
+      ).catchError((Object error, StackTrace stack) {
+        debugPrint('Failed to schedule streak reminders: $error\n$stack');
+      }),
+    );
 
     return data;
   }

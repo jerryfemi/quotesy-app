@@ -219,17 +219,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           Positioned(
             left: 20,
             right: 20,
-            bottom: 160,
+            bottom: 200,
             child: IgnorePointer(
               child: AnimatedOpacity(
                 opacity: _ghostHintOpacity,
-                duration: const Duration(seconds: 3),
+                duration: const Duration(seconds: 5),
                 curve: Curves.easeOut,
                 child: const Text(
                   'Double-tap to save  •  Long-press to share',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: QColors.textPrimary,
                     fontFamily: 'Inter',
                     fontStyle: FontStyle.italic,
                     letterSpacing: 1.2,
@@ -330,10 +330,10 @@ class _NarrowFeedHint extends ConsumerWidget {
       child: IgnorePointer(
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.07),
+            color: QColors.borderSubtle,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.12),
+              color: QColors.borderMid,
               width: 1,
             ),
           ),

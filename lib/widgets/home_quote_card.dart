@@ -165,7 +165,7 @@ class _HomeQuoteCardState extends ConsumerState<HomeQuoteCard> {
                           ),
                           color: _lastBookmarkActionSaved
                               ? QColors.amberGlow
-                              : Colors.white70,
+                              : QColors.textMuted,
                           size: 56,
                         )
                       : const SizedBox.shrink(key: ValueKey('bookmark-hidden')),

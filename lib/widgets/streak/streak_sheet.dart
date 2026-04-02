@@ -64,7 +64,7 @@ class StreakSheet extends ConsumerWidget {
                 width: 42,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
+                  color: QColors.textPrimary.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),

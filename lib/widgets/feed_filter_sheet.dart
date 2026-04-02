@@ -83,7 +83,7 @@ class _FeedFilterSheetState extends ConsumerState<FeedFilterSheet> {
                 width: 42,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
+                  color: QColors.textPrimary.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -281,13 +281,13 @@ class _CategoryFilterTile extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(10, 4, 8, 6),
       decoration: BoxDecoration(
         color: isSelected
-            ? Colors.white.withValues(alpha: 0.03)
+            ? QColors.textPrimary.withValues(alpha: 0.03)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isSelected
-              ? Colors.white.withValues(alpha: 0.10)
-              : Colors.white.withValues(alpha: 0.04),
+              ? QColors.textPrimary.withValues(alpha: 0.10)
+              : QColors.textPrimary.withValues(alpha: 0.04),
           width: 1,
         ),
       ),
@@ -394,7 +394,7 @@ class _CategoryRow extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: QColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -488,13 +488,13 @@ class _CircleCheck extends StatelessWidget {
         border: Border.all(
           color: isChecked
               ? QColors.amberGlow
-              : Colors.white.withValues(alpha: 0.30),
+              : QColors.textPrimary.withValues(alpha: 0.30),
           width: 1.2,
         ),
       ),
       child: isChecked
           ? const Center(
-              child: Icon(Icons.check, size: 14, color: Colors.white),
+              child: Icon(Icons.check, size: 14, color: QColors.textPrimary),
             )
           : null,
     );

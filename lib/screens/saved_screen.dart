@@ -205,7 +205,7 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
                       fontSize: 11,
                       fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                       letterSpacing: 1.8,
-                      color: isActive ? Colors.white : QColors.textSubtle,
+                      color: isActive ? QColors.textPrimary : QColors.textSubtle,
                     ),
                   ),
                 ),
@@ -335,7 +335,7 @@ class _SavedQuoteCard extends StatelessWidget {
     Navigator.of(context).push(
       PageRouteBuilder(
         opaque: false,
-        barrierColor: Colors.black87,
+        barrierColor: QColors.obsidian.withValues(alpha: 0.87),
         barrierDismissible: true,
         pageBuilder: (_, _, _) => _QuoteDetailScreen(
           quote: quote,

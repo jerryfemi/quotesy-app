@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-
-const _kAmber = Color(0xFFB8860B);
-const _kAmberGlow = Color(0xFFD4A017);
+import '../theme/quotesy_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NavBarController
@@ -115,7 +113,7 @@ class _QuotesyShellState extends State<QuotesyShell> {
     return NavBarControllerScope(
       controller: _navBarController,
       child: Scaffold(
-        backgroundColor: const Color(0xFF050505),
+        backgroundColor: QNavColors.shellBackground,
         extendBody: true,
         body: Stack(
           children: [
@@ -187,6 +185,9 @@ class QuotesyNavBar extends StatelessWidget {
     final isHome = currentIndex == 0;
     final isExplore = currentIndex == 1;
     final isSaved = currentIndex == 2;
+    final rawScale = MediaQuery.textScalerOf(context).scale(1.0);
+    final navLabelScale = rawScale.clamp(1.0, 1.08);
+    final navHeight = rawScale > 1.2 ? 56.0 : 52.0;
 
     return AnimatedSlide(
       // 2.0 = guaranteed full hide on any device height, replacing fragile 1.8
@@ -198,60 +199,54 @@ class QuotesyNavBar extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
           child: SizedBox(
-            height: 52,
+            height: navHeight,
             child: Stack(
               children: [
                 Align(
                   alignment: Alignment.bottomCenter,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF111111),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.07),
-                        width: 1,
+                  child: Padding(
+                    // Reserve room for the detached Saved circle at large text scales.
+                    padding: const EdgeInsets.only(right: 56),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 7,
                       ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x8C000000), // black @ 55%
-                          blurRadius: 24,
-                          offset: Offset(0, 8),
+                      decoration: BoxDecoration(
+                        color: QNavColors.pillBackground,
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: QNavColors.pillBorder,
+                          width: 1,
                         ),
-                        BoxShadow(
-                          color: Color(0x14B8860B), // amber @ 8%
-                          blurRadius: 20,
-                          spreadRadius: -4,
-                          offset: Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _PillTabButton(
-                          icon: Icons.format_quote_outlined,
-                          label: 'Home',
-                          isActive: isHome,
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            onTap(0);
-                          },
-                        ),
-                        const SizedBox(width: 6),
-                        _PillTabButton(
-                          icon: Icons.travel_explore_outlined,
-                          label: 'Explore',
-                          isActive: isExplore,
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            onTap(1);
-                          },
-                        ),
-                      ],
+                       
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _PillTabButton(
+                            icon: Icons.format_quote_outlined,
+                            label: 'Home',
+                            isActive: isHome,
+                            labelScale: navLabelScale,
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              onTap(0);
+                            },
+                          ),
+                          const SizedBox(width: 6),
+                          _PillTabButton(
+                            icon: Icons.travel_explore_outlined,
+                            label: 'Explore',
+                            isActive: isExplore,
+                            labelScale: navLabelScale,
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              onTap(1);
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -274,29 +269,29 @@ class QuotesyNavBar extends StatelessWidget {
                           height: 48,
                           decoration: BoxDecoration(
                             color: Color.lerp(
-                              const Color(0xFF111111),
-                              _kAmber.withValues(alpha: 0.20),
+                              QNavColors.pillBackground,
+                              QNavColors.accent.withValues(alpha: 0.20),
                               t,
                             ),
                             shape: BoxShape.circle,
                             border: Border.all(
                               color: Color.lerp(
-                                Colors.white.withValues(alpha: 0.07),
-                                _kAmber.withValues(alpha: 0.45),
+                                QNavColors.pillBorder,
+                                QNavColors.accent.withValues(alpha: 0.45),
                                 t,
                               )!,
                               width: 1,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.55),
+                                color: QNavColors.detachedShadow,
                                 blurRadius: 20,
                                 offset: const Offset(0, 8),
                               ),
                               // Amber glow only animates when saved
                               if (t > 0)
                                 BoxShadow(
-                                  color: _kAmber.withValues(alpha: 0.15 * t),
+                                  color: QNavColors.accent.withValues(alpha: 0.15 * t),
                                   blurRadius: 12,
                                   spreadRadius: -2,
                                 ),
@@ -305,7 +300,7 @@ class QuotesyNavBar extends StatelessWidget {
                           child: Icon(
                             Icons.bookmark_outline_rounded,
                             size: 20,
-                            color: Color.lerp(Colors.white38, _kAmberGlow, t),
+                            color: Color.lerp(QNavColors.inactive, QNavColors.accentGlow, t),
                           ),
                         );
                       },
@@ -325,12 +320,14 @@ class _PillTabButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool isActive;
+  final double labelScale;
   final VoidCallback onTap;
 
   const _PillTabButton({
     required this.icon,
     required this.label,
     required this.isActive,
+    required this.labelScale,
     required this.onTap,
   });
 
@@ -345,12 +342,12 @@ class _PillTabButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: isActive
-              ? _kAmber.withValues(alpha: 0.18)
+              ? QNavColors.accent.withValues(alpha: 0.18)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive
-                ? _kAmber.withValues(alpha: 0.35)
+                ? QNavColors.accent.withValues(alpha: 0.35)
                 : Colors.transparent,
             width: 1,
           ),
@@ -361,17 +358,18 @@ class _PillTabButton extends StatelessWidget {
             Icon(
               icon,
               size: 18,
-              color: isActive ? _kAmberGlow : Colors.white38,
+              color: isActive ? QNavColors.accentGlow : QNavColors.inactive,
             ),
             const SizedBox(width: 6),
             Text(
               label,
+              textScaler: TextScaler.linear(labelScale),
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 13,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                 letterSpacing: 0.2,
-                color: isActive ? _kAmberGlow : Colors.white38,
+                color: isActive ? QNavColors.accentGlow : QNavColors.inactive,
               ),
             ),
           ],
