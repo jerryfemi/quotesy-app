@@ -9,6 +9,7 @@ import 'package:quotesy/widgets/streak/streak_sheet.dart';
 import '../models/quote.dart';
 import '../models/streak_model.dart';
 import '../providers/database_provider.dart';
+import '../services/notifications.dart';
 import '../services/quote_share_service.dart';
 import '../theme/quotesy_theme.dart';
 import '../widgets/feed_filter_sheet.dart';
@@ -22,7 +23,8 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+  with WidgetsBindingObserver {
   final _pageController = PageController();
   static const int _narrowFeedThreshold = 20;
   int _currentIndex = 0;
@@ -37,18 +39,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _showGestureHintOnce();
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_syncNotificationsOnResume());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _hintRevealTimer?.cancel();
     _hintAutoFadeTimer?.cancel();
     _hintRemoveTimer?.cancel();
     _pageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _syncNotificationsOnResume() async {
+    try {
+      await ref.read(databaseInitProvider.future);
+      if (!mounted) return;
+
+      final db = ref.read(databaseServiceProvider);
+      final streak = ref.read(streakProvider);
+
+      await Notifications().resyncIfNeeded(database: db, streak: streak);
+    } catch (error, stack) {
+      debugPrint('Resume notification sync failed (continuing): $error\n$stack');
+    }
   }
 
   Future<void> _showGestureHintOnce() async {

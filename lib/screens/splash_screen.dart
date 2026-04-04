@@ -8,8 +8,7 @@ import 'package:purchases_flutter/purchases_flutter.dart';
 
 import '../models/streak_model.dart';
 import '../providers/database_provider.dart';
-import '../services/home_widget_service.dart';
-import '../services/notification_service.dart';
+import '../services/notifications.dart';
 import '../theme/quotesy_theme.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -36,7 +35,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   late final Animation<double> _brandShimmerAnimation;
   late final Animation<Color?> _esyColorAnimation;
   late final Animation<double> _exitOpacity;
-  late final Future<bool> _notificationInitFuture;
 
   @override
   void initState() {
@@ -138,8 +136,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   void _initOtherServices() {
     unawaited(_safeInitRevenueCat());
-    _notificationInitFuture = _safeInitNotifications();
-    unawaited(_notificationInitFuture);
+    unawaited(Notifications().initialize());
   }
 
   Future<void> _safeInitRevenueCat() async {
@@ -153,49 +150,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     }
   }
 
-  Future<bool> _safeInitNotifications() async {
-    try {
-      final notificationService = NotificationService();
-      await notificationService.init();
-      return await notificationService.requestPermissions();
-    } catch (error, stack) {
-      debugPrint('Notification init failed (continuing): $error\n$stack');
-      return false;
-    }
-  }
-
   Future<void> _runPostHandoffSync(StreakData streak) async {
-    try {
-      final db = ref.read(databaseServiceProvider);
-      await refreshQuotesyHomeWidget(db);
-
-      final notificationsReady = await _notificationInitFuture;
-      if (!notificationsReady) {
-        debugPrint(
-          'Post-handoff sync skipped notification scheduling: permissions not granted.',
-        );
-        return;
-      }
-
-      var quotes = db.getFilteredFeed(
-        selectedCategories: db.getSelectedCategories(),
-        selectedAuthors: db.getSelectedAuthors(),
-      );
-
-      if (quotes.isEmpty) {
-        debugPrint(
-          'Filtered feed is empty at startup; using full quote library for daily scheduling.',
-        );
-        quotes = db.getAllQuotes();
-      }
-
-      await NotificationService().syncScheduledNotifications(
-        quotes: quotes,
-        streak: streak,
-      );
-    } catch (error, stack) {
-      debugPrint('Post-handoff sync failed (continuing): $error\n$stack');
-    }
+    final db = ref.read(databaseServiceProvider);
+    await Notifications().initializeAndSync(database: db, streak: streak);
   }
 
   @override

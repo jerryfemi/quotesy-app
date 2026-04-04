@@ -38,16 +38,7 @@ class StreakSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    var streak = ref.watch(streakProvider);
-
-    // Sync with Home Screen's debug screenshot mode
-    const bool debugScreenshotMode = true;
-    if (kDebugMode && debugScreenshotMode) {
-      streak = streak.copyWith(
-        currentStreak: 24,
-        bestStreak: streak.bestStreak < 24 ? 24 : streak.bestStreak,
-      );
-    }
+    final streak = ref.watch(streakProvider);
 
     final isLostVisually = _isLostVisually(streak);
     final bottomPadding = MediaQuery.maybeOf(context)?.padding.bottom ?? 0;
@@ -97,13 +88,9 @@ class StreakSheet extends ConsumerWidget {
               Expanded(
                 child: ListView(
                   controller: scrollController,
-                  padding:
-                      EdgeInsets.fromLTRB(20, 20, 20, bottomPadding + 28),
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding + 28),
                   children: [
-                    StreakHeroBlock(
-                      streak: streak,
-                      isActive: !isLostVisually,
-                    ),
+                    StreakHeroBlock(streak: streak, isActive: !isLostVisually),
                     const SizedBox(height: 24),
                     const StreakSheetDivider(),
                     const SizedBox(height: 24),
@@ -121,6 +108,27 @@ class StreakSheet extends ConsumerWidget {
                       const SizedBox(height: 24),
                     ],
                     StreakRulesSection(isActive: !isLostVisually),
+                    if (kDebugMode && !streak.canRestore) ...[
+                      const SizedBox(height: 32),
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: () {
+                            ref
+                                .read(streakProvider.notifier)
+                                .debugBreakStreak();
+                          },
+                          icon: const Icon(Icons.bug_report_outlined, size: 16),
+                          label: const Text('Debug: Force Break'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: QColors.danger,
+                            textStyle: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

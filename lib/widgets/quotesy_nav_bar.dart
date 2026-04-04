@@ -90,8 +90,7 @@ class QuotesyShell extends StatefulWidget {
 }
 
 class _QuotesyShellState extends State<QuotesyShell> {
-  // Controller is created once and provided via scope.
-  // No manual listener needed — InheritedNotifier handles propagation.
+ 
   final NavBarController _navBarController = NavBarController();
 
   @override
@@ -122,8 +121,7 @@ class _QuotesyShellState extends State<QuotesyShell> {
               left: 0,
               right: 0,
               bottom: 0,
-              // QuotesyNavBar now reads visible from the scope itself.
-              // No currentIndex/visible props need to flow through setState.
+          
               child: _NavBarConsumer(
                 currentIndex: widget.navigationShell.currentIndex,
                 onTap: _onTabTapped,
@@ -136,13 +134,7 @@ class _QuotesyShellState extends State<QuotesyShell> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// _NavBarConsumer
-//
-// Thin wrapper that reads `visible` from NavBarControllerScope and passes it
-// to QuotesyNavBar. Because it calls dependOnInheritedWidgetOfExactType,
-// only this subtree rebuilds when visibility changes — not QuotesyShell.
-// ─────────────────────────────────────────────────────────────────────────────
+
 class _NavBarConsumer extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -160,14 +152,7 @@ class _NavBarConsumer extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// QuotesyNavBar
-//
-// Center: compact Home/Explore pill.
-// Right: detached circular Saved button.
-// AnimatedSlide with Offset(0, 2.0) — safe ceiling that fully clears any
-// device height, replacing the fragile 1.8 value.
-// ─────────────────────────────────────────────────────────────────────────────
+
 class QuotesyNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -190,7 +175,6 @@ class QuotesyNavBar extends StatelessWidget {
     final navHeight = rawScale > 1.2 ? 56.0 : 52.0;
 
     return AnimatedSlide(
-      // 2.0 = guaranteed full hide on any device height, replacing fragile 1.8
       offset: visible ? Offset.zero : const Offset(0, 2.0),
       duration: const Duration(milliseconds: 250),
       curve: visible ? Curves.easeOut : Curves.easeIn,

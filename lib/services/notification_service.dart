@@ -58,16 +58,7 @@ class NotificationService {
 
   Future<void> init() async {
     tz.initializeTimeZones();
-    try {
-      final dynamic info = await FlutterTimezone.getLocalTimezone();
-      final String timeZoneName = info?.toString() ?? 'UTC';
-      tz.setLocalLocation(tz.getLocation(timeZoneName));
-      debugPrint('[NotificationService] Timezone set to: $timeZoneName');
-    } catch (e) {
-      debugPrint(
-        '[NotificationService] Failed to set local timezone, defaulting to UTC: $e',
-      );
-    }
+    await _setLocalTimezone();
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings(
@@ -84,6 +75,70 @@ class NotificationService {
       onDidReceiveNotificationResponse: (_) {
         // v2: deep-link to specific quote
       },
+    );
+
+    await _createAndroidChannels();
+  }
+
+  Future<void> _setLocalTimezone() async {
+    try {
+      final dynamic info = await FlutterTimezone.getLocalTimezone();
+      final raw = info?.toString() ?? 'UTC';
+      final resolved = _extractIanaTimeZone(raw) ?? 'UTC';
+      tz.setLocalLocation(tz.getLocation(resolved));
+      debugPrint('[NotificationService] Timezone set to: $resolved (raw=$raw)');
+    } catch (e) {
+      tz.setLocalLocation(tz.getLocation('UTC'));
+      debugPrint(
+        '[NotificationService] Failed to set local timezone, defaulting to UTC: $e',
+      );
+    }
+  }
+
+  String? _extractIanaTimeZone(String raw) {
+    // Handles both plain IANA names (e.g. Africa/Lagos) and values like:
+    // TimezoneInfo(Africa/Lagos, (locale: en_NG, name: West Africa Standard Time))
+    final direct = raw.trim();
+    if (direct.contains('/') &&
+        !direct.contains('(') &&
+        !direct.contains(' ')) {
+      return direct;
+    }
+
+    final match = RegExp(
+      r'([A-Za-z_]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?)',
+    ).firstMatch(raw);
+    return match?.group(1);
+  }
+
+  Future<void> _createAndroidChannels() async {
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
+    if (android == null) return;
+
+    await android.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _quoteChannelId,
+        _quoteChannelName,
+        description: _quoteChannelDesc,
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+      ),
+    );
+
+    await android.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _alertChannelId,
+        _alertChannelName,
+        description: _alertChannelDesc,
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+      ),
     );
   }
 
@@ -163,13 +218,15 @@ class NotificationService {
 
     if (android != null) {
       try {
-        notificationsEnabled = await (android as dynamic).areNotificationsEnabled();
+        notificationsEnabled = await (android as dynamic)
+            .areNotificationsEnabled();
       } catch (_) {
         notificationsEnabled = null;
       }
 
       try {
-        canScheduleExact = await (android as dynamic).canScheduleExactNotifications();
+        canScheduleExact = await (android as dynamic)
+            .canScheduleExactNotifications();
       } catch (_) {
         canScheduleExact = null;
       }
@@ -206,6 +263,7 @@ class NotificationService {
   Future<void> syncScheduledNotifications({
     required List<Quote> quotes,
     required StreakData streak,
+    bool forceRefreshQuotes = false,
   }) async {
     final pending = await _plugin.pendingNotificationRequests();
     final dailyQuotesCount = pending
@@ -213,11 +271,11 @@ class NotificationService {
         .length;
 
     // If we have fewer than 7 days of quotes queued, top it up.
-    // We always redo the batch to ensure we have the next 7 days from *now*
-    // rather than waiting for the entire old batch to expire.
-    if (dailyQuotesCount < 7) {
+
+    if (forceRefreshQuotes || dailyQuotesCount < 7) {
       debugPrint(
-        '[NotificationService] Sync: Refreshing 7-day quote queue ($dailyQuotesCount pending)',
+        '[NotificationService] Sync: Refreshing 7-day quote queue '
+        '(force=$forceRefreshQuotes, pending=$dailyQuotesCount)',
       );
       await scheduleDailyQuotes(quotes);
     } else {
@@ -256,7 +314,7 @@ class NotificationService {
     final now = tz.TZDateTime.now(tz.local);
 
     // 3. Find the first available 9:00 AM slot (either today if < 9am, or tomorrow)
-    var firstSlot = tz.TZDateTime(tz.local, now.year, now.month, now.day, 15);
+    var firstSlot = tz.TZDateTime(tz.local, now.year, now.month, now.day, 9);
     if (firstSlot.isBefore(now)) {
       firstSlot = firstSlot.add(const Duration(days: 1));
     }
@@ -439,16 +497,19 @@ class NotificationService {
 
   // ── Notification Details ─────────────────────────────────────────────────
 
-  /// Quiet notification for daily quotes — no heads-up, no vibration.
+  /// Loud notification for daily quotes — heads-up, sound, and vibration.
   NotificationDetails _quoteDetails({String? bigText}) {
     return NotificationDetails(
       android: AndroidNotificationDetails(
         _quoteChannelId,
         _quoteChannelName,
         channelDescription: _quoteChannelDesc,
-        importance: Importance.defaultImportance,
-        priority: Priority.defaultPriority,
+        importance: Importance.max,
+        priority: Priority.max,
         color: QColors.amberGlow,
+        playSound: true,
+        enableVibration: true,
+        visibility: NotificationVisibility.public,
         styleInformation: bigText != null
             ? BigTextStyleInformation(
                 bigText,
@@ -460,7 +521,7 @@ class NotificationService {
       iOS: const DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
-        presentSound: false,
+        presentSound: true,
       ),
     );
   }

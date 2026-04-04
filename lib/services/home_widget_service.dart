@@ -45,6 +45,9 @@ Future<void> refreshQuotesyHomeWidget(DatabaseService service) async {
   }
 
   final feed = selected;
+  debugPrint(
+    '[HomeWidget] Refresh start (poolCandidates=${feed.length}, appGroup=com.jerryfemi.quotesy)',
+  );
   if (feed.isEmpty) {
     await HomeWidget.saveWidgetData<String>(_widgetPoolKey, null);
     await HomeWidget.saveWidgetData<int>(_widgetIndexKey, null);
@@ -54,6 +57,7 @@ Future<void> refreshQuotesyHomeWidget(DatabaseService service) async {
     );
     await HomeWidget.saveWidgetData<String>(_widgetAuthorKey, 'QUOTESY');
     await HomeWidget.updateWidget(androidName: _widgetProviderName);
+    debugPrint('[HomeWidget] Refresh complete (fallback content written)');
     return;
   }
 
@@ -71,4 +75,5 @@ Future<void> refreshQuotesyHomeWidget(DatabaseService service) async {
   );
 
   await HomeWidget.updateWidget(androidName: _widgetProviderName);
+  debugPrint('[HomeWidget] Refresh complete (poolSize=${pool.length})');
 }

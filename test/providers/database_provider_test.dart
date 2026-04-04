@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -145,7 +144,7 @@ void main() {
         );
         addTearDown(container.dispose);
 
-        final sub = container.listen(filteredFeedProvider, (_, __) {});
+        final sub = container.listen(filteredFeedProvider, (_, _) {});
         expect(sub.read().isLoading, true);
         expect(fakeDb.lastFilterCategories, isEmpty);
 
@@ -171,7 +170,7 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final sub = container.listen(filteredFeedProvider, (_, __) {});
+      final sub = container.listen(filteredFeedProvider, (_, _) {});
       expect(sub.read().isLoading, true);
 
       await Future<void>.delayed(const Duration(milliseconds: 10));

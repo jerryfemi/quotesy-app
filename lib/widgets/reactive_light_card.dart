@@ -2,23 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/category_style.dart';
 import '../theme/quotesy_theme.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ReactiveLightCard
-//
-// The lighting system works in 3 layers, bottom to top:
-//
-//   1. BASE CARD     — pure #080604, the darkroom floor
-//   2. LIGHT LAYERS  — the category gradients (the actual lighting)
-//   3. CONTENT       — tag, title, subtitle
-// Nothing sits between the base and the light layers.
-// No dark overlays, no backdrop blur — those were killing the gradients.
-//
-// Unfocused cards: light layers at glowBaseline so the card
-// breathes with colour even when not centred.
-//
-// Focused cards: light layers at 100%, rim border brightens.
-//
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 class ReactiveLightCard extends StatelessWidget {
   final CategoryStyle style;
@@ -38,7 +22,6 @@ class ReactiveLightCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Apply easeOutCubic so the glow accelerates into focus — feels alive.
     final glowFocus = Curves.easeOutCubic.transform(
       focusAmount.clamp(0.0, 1.0),
     );
