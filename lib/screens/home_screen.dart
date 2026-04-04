@@ -26,6 +26,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen>
   with WidgetsBindingObserver {
   final _pageController = PageController();
+  ProviderSubscription<AsyncValue<List<Quote>>>? _feedSubscription;
   static const int _narrowFeedThreshold = 20;
   int _currentIndex = 0;
   bool _feedResetQueued = false;
@@ -40,6 +41,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _feedSubscription = ref.listenManual<AsyncValue<List<Quote>>>(
+      filteredFeedProvider,
+      (previous, next) {
+        final previousQuotes = previous?.maybeWhen(
+          data: (value) => value,
+          orElse: () => null,
+        );
+        final nextQuotes = next.maybeWhen(
+          data: (value) => value,
+          orElse: () => null,
+        );
+
+        if (previousQuotes == null || nextQuotes == null) return;
+        if (_didFeedChange(previousQuotes, nextQuotes)) {
+          _queueResetToFirstQuote();
+        }
+      },
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _showGestureHintOnce();
     });
@@ -55,6 +74,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _feedSubscription?.close();
     _hintRevealTimer?.cancel();
     _hintAutoFadeTimer?.cancel();
     _hintRemoveTimer?.cancel();
@@ -169,22 +189,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AsyncValue<List<Quote>>>(filteredFeedProvider, (previous, next) {
-      final previousQuotes = previous?.maybeWhen(
-        data: (value) => value,
-        orElse: () => null,
-      );
-      final nextQuotes = next.maybeWhen(
-        data: (value) => value,
-        orElse: () => null,
-      );
-
-      if (previousQuotes == null || nextQuotes == null) return;
-      if (_didFeedChange(previousQuotes, nextQuotes)) {
-        _queueResetToFirstQuote();
-      }
-    });
-
     final quotes = ref
         .watch(filteredFeedProvider)
         .maybeWhen(data: (value) => value, orElse: () => <Quote>[]);
@@ -245,7 +249,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           Positioned(
             left: 20,
             right: 20,
-            bottom: 200,
+            bottom: 250,
             child: IgnorePointer(
               child: AnimatedOpacity(
                 opacity: _ghostHintOpacity,
@@ -255,7 +259,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   'Double-tap to save  •  Long-press to share',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: QColors.textPrimary,
+                    color: QColors.amber,
                     fontFamily: 'Inter',
                     fontStyle: FontStyle.italic,
                     letterSpacing: 1.2,

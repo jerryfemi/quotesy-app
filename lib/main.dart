@@ -2,7 +2,6 @@ import 'package:device_preview/device_preview.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:home_widget/home_widget.dart';
 
 import 'routes/app_router.dart';
 import 'theme/quotesy_theme.dart';
@@ -10,11 +9,6 @@ import 'theme/quotesy_theme.dart';
 Future<void> main() async {
   // Essential for app startup
   WidgetsFlutterBinding.ensureInitialized();
-
-  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-    await HomeWidget.setAppGroupId('com.jerryfemi.quotesy');
-  }
-
  
   runApp(
     ProviderScope(

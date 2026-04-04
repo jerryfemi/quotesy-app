@@ -1,8 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/streak_model.dart';
 import 'database_service.dart';
-import 'home_widget_service.dart';
 import 'notification_service.dart';
 
 /// Thin coordinator that exposes one clean API for app-level notification sync.
@@ -21,14 +22,8 @@ class Notifications {
   Future<bool> initializeAndSync({
     required DatabaseService database,
     required StreakData streak,
-    bool refreshHomeWidget = true,
-    bool forceRefreshQuotes = false,
   }) async {
     try {
-      if (refreshHomeWidget) {
-        await refreshQuotesyHomeWidget(database);
-      }
-
       final notificationsEnabled = await initialize();
       if (!notificationsEnabled) {
         debugPrint(
@@ -40,7 +35,6 @@ class Notifications {
       await _sync(
         database: database,
         streak: streak,
-        forceRefreshQuotes: forceRefreshQuotes,
       );
       return true;
     } catch (error, stack) {
@@ -79,7 +73,6 @@ class Notifications {
   Future<void> _sync({
     required DatabaseService database,
     required StreakData streak,
-    bool forceRefreshQuotes = false,
   }) async {
     var quotes = database.getFilteredFeed(
       selectedCategories: database.getSelectedCategories(),
@@ -97,7 +90,6 @@ class Notifications {
     await service.syncScheduledNotifications(
       quotes: quotes,
       streak: streak,
-      forceRefreshQuotes: forceRefreshQuotes,
     );
 
     final diagnostics = await service.getDiagnostics();
