@@ -1,0 +1,1 @@
+I am using Remotion in the /promo-video directory. Always refer to Remotion documentation and the src/Composition.tsx file when I ask for video edits."

@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* Fonts are loaded via JavaScript (see styles/loadFonts.ts)                  */
+/* to avoid Webpack CSS-loader path resolution issues with Remotion.          */
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+/* Base reset for Remotion compositions */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
