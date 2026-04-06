@@ -1,5 +1,4 @@
 import 'package:device_preview/device_preview.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,7 +8,7 @@ import 'theme/quotesy_theme.dart';
 Future<void> main() async {
   // Essential for app startup
   WidgetsFlutterBinding.ensureInitialized();
- 
+
   runApp(
     ProviderScope(
       child: DevicePreview(

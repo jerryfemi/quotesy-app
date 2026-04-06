@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 
 import '../models/streak_model.dart';
@@ -32,10 +30,7 @@ class Notifications {
         return false;
       }
 
-      await _sync(
-        database: database,
-        streak: streak,
-      );
+      await _sync(database: database, streak: streak);
       return true;
     } catch (error, stack) {
       debugPrint('[Notifications] initializeAndSync failed: $error\n$stack');
@@ -87,10 +82,7 @@ class Notifications {
     }
 
     final service = NotificationService();
-    await service.syncScheduledNotifications(
-      quotes: quotes,
-      streak: streak,
-    );
+    await service.syncScheduledNotifications(quotes: quotes, streak: streak);
 
     final diagnostics = await service.getDiagnostics();
     debugPrint('[Notifications] Diagnostics start');

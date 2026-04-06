@@ -83,15 +83,23 @@ class NotificationService {
   Future<void> _setLocalTimezone() async {
     try {
       final dynamic info = await FlutterTimezone.getLocalTimezone();
-      final raw = info?.toString() ?? 'UTC';
-      final resolved = _extractIanaTimeZone(raw) ?? 'UTC';
+      final raw = info?.toString() ?? '';
+      if (raw.isEmpty) {
+        throw Exception('FlutterTimezone returned empty string');
+      }
+
+      final resolved = _extractIanaTimeZone(raw);
+      if (resolved == null) {
+        throw Exception('Could not extract IANA timezone from: $raw');
+      }
+
       tz.setLocalLocation(tz.getLocation(resolved));
       debugPrint('[NotificationService] Timezone set to: $resolved (raw=$raw)');
     } catch (e) {
-      tz.setLocalLocation(tz.getLocation('UTC'));
       debugPrint(
-        '[NotificationService] Failed to set local timezone, defaulting to UTC: $e',
+        '[NotificationService] CRITICAL: Failed to set local timezone: $e',
       );
+      rethrow; // Fail fast instead of silently defaulting to UTC
     }
   }
 
@@ -291,7 +299,7 @@ class NotificationService {
 
   // Quote of the Day
 
-  /// Schedules up to 7 days of quote notifications at 9 AM, using the user's
+  /// Schedules up to 7 days of quote notifications at 7 PM, using the user's
   /// filtered quote list. Cancels any previously scheduled batch first.
   Future<void> scheduleDailyQuotes(List<Quote> quotes) async {
     // 1. Cancel the old batch to avoid duplicates
@@ -447,57 +455,10 @@ class NotificationService {
         "Don't let $count days of wisdom slip away tonight!";
   }
 
-  // Notification Details — Quiet (Quotes) vs. Loud (Alerts)
 
-  // ── Debug Testing ────────────────────────────────────────────────────────
-
-  /// Immediate fire of a "daily quote" style notification.
-  Future<void> testDailyQuote() async {
-    const testText = 'The only way to do great work is to love what you do.';
-    const testAuthor = 'Steve Jobs';
-    await _plugin.show(
-      id: 999,
-      title: 'Quote of the Day',
-      body: '"$testText" — $testAuthor',
-      notificationDetails: _quoteDetails(
-        bigText: '"$testText"\n\n— $testAuthor',
-      ),
-    );
-  }
-
-  /// Immediate fire of an 8 PM-style streak reminder.
-  Future<void> testStreakReminder() async {
-    await _plugin.show(
-      id: 998,
-      title: 'Keep the flame alive 🔥',
-      body: "Don't let your 7-day streak flicker out!",
-      notificationDetails: _alertDetails(),
-    );
-  }
-
-  /// Immediate fire of a 9 AM-style streak break alarm.
-  Future<void> testStreakBreak() async {
-    await _plugin.show(
-      id: 997,
-      title: 'The flame has gone out',
-      body:
-          'Your streak was lost to time yesterday. '
-          'Relight the flame now to restore your progress.',
-      notificationDetails: _alertDetails(),
-    );
-  }
-
-  /// Immediate fire of a success alert.
-  Future<void> testStreakRestored() async {
-    await showInstantAlert(
-      'Streak Restored!',
-      'You are back to a 7-day streak.',
-    );
-  }
 
   // ── Notification Details ─────────────────────────────────────────────────
 
-  /// Loud notification for daily quotes — heads-up, sound, and vibration.
   NotificationDetails _quoteDetails({String? bigText}) {
     return NotificationDetails(
       android: AndroidNotificationDetails(
@@ -526,7 +487,7 @@ class NotificationService {
     );
   }
 
-  /// Loud notification for streak alerts — heads-up, vibration, full priority.
+  
   NotificationDetails _alertDetails() {
     return const NotificationDetails(
       android: AndroidNotificationDetails(
