@@ -87,7 +87,7 @@ export const PhoneReveal: React.FC = () => {
     return { y, opacity };
   };
 
-  const fadeOut = interpolate(frame, [235, 255], [1, 0], {
+  const textFadeOut = interpolate(frame, [235, 255], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.in(Easing.cubic),
@@ -104,7 +104,7 @@ export const PhoneReveal: React.FC = () => {
         alignItems: "center",
         justifyContent: "flex-start",
         position: "relative",
-        opacity: fadeOut,
+        // Opacity of scene stays firmly at 1 so the phone doesn't flash out
         overflow: "hidden",
       }}
     >
@@ -129,7 +129,7 @@ export const PhoneReveal: React.FC = () => {
           flexDirection: "column",
           alignItems: "center",
           zIndex: 2,
-          opacity: textOpacity,
+          opacity: textOpacity * textFadeOut, // Text fades out properly before the cut
           transform: `translateY(${textSlide}px)`,
         }}
       >

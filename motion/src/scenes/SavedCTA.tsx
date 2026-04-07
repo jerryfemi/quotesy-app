@@ -20,12 +20,6 @@ import { SavedScreen } from "../components/SavedScreen";
 export const SavedCTA: React.FC = () => {
   const frame = useCurrentFrame();
 
-  // ── Phone opacity (frames 0–20) ──
-  const phoneOpacity = interpolate(frame, [0, 20], [0, 1], {
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-
   // ── Screen crossfade (frames 0–35) ──
   const screenFade = interpolate(frame, [0, 35], [0, 1], {
     extrapolateLeft: "clamp",
@@ -103,7 +97,7 @@ export const SavedCTA: React.FC = () => {
           marginTop: 48,
           transform: "scale(1.4)",
           transformOrigin: "top center",
-          opacity: phoneOpacity,
+          opacity: 1, // Phone is firmly at 1.0 opacity from the very first frame to seamlessly carry over from Scene 2
           zIndex: 1,
         }}
       >

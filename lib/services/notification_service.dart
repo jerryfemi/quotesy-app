@@ -81,42 +81,9 @@ class NotificationService {
   }
 
   Future<void> _setLocalTimezone() async {
-    try {
-      final dynamic info = await FlutterTimezone.getLocalTimezone();
-      final raw = info?.toString() ?? '';
-      if (raw.isEmpty) {
-        throw Exception('FlutterTimezone returned empty string');
-      }
-
-      final resolved = _extractIanaTimeZone(raw);
-      if (resolved == null) {
-        throw Exception('Could not extract IANA timezone from: $raw');
-      }
-
-      tz.setLocalLocation(tz.getLocation(resolved));
-      debugPrint('[NotificationService] Timezone set to: $resolved (raw=$raw)');
-    } catch (e) {
-      debugPrint(
-        '[NotificationService] CRITICAL: Failed to set local timezone: $e',
-      );
-      rethrow; // Fail fast instead of silently defaulting to UTC
-    }
-  }
-
-  String? _extractIanaTimeZone(String raw) {
-    // Handles both plain IANA names (e.g. Africa/Lagos) and values like:
-    // TimezoneInfo(Africa/Lagos, (locale: en_NG, name: West Africa Standard Time))
-    final direct = raw.trim();
-    if (direct.contains('/') &&
-        !direct.contains('(') &&
-        !direct.contains(' ')) {
-      return direct;
-    }
-
-    final match = RegExp(
-      r'([A-Za-z_]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?)',
-    ).firstMatch(raw);
-    return match?.group(1);
+    final info = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(info.identifier));
+    debugPrint('[NotificationService] Timezone set to: ${info.identifier}');
   }
 
   Future<void> _createAndroidChannels() async {
@@ -319,24 +286,31 @@ class NotificationService {
     final count = pool.length < 7 ? pool.length : 7;
     final scheduleMode = await _resolveScheduleMode();
 
-    final now = tz.TZDateTime.now(tz.local);
+    final now = DateTime.now();
 
-    // 3. Find the first available 9:00 AM slot (either today if < 9am, or tomorrow)
-    var firstSlot = tz.TZDateTime(tz.local, now.year, now.month, now.day, 9);
-    if (firstSlot.isBefore(now)) {
-      firstSlot = firstSlot.add(const Duration(days: 1));
+    // 3. Find the first available 6:30 PM slot using Native DateTime
+    int startDayOffset = 0;
+    final today630pm = DateTime(now.year, now.month, now.day, 20, 20);
+    if (today630pm.isBefore(now)) {
+      startDayOffset = 1;
     }
 
     // 4. Schedule the rolling window
     for (var i = 0; i < count; i++) {
       final quote = pool[i];
-      final scheduleDate = firstSlot.add(Duration(days: i));
+      final intendedTime = DateTime(
+        now.year,
+        now.month,
+        now.day + startDayOffset + i,
+        20,
+        20,
+      );
 
       await _plugin.zonedSchedule(
         id: _dailyQuoteIdBase + i,
         title: 'Quote of the Day',
         body: '"${quote.text}" — ${quote.author}',
-        scheduledDate: scheduleDate,
+        scheduledDate: tz.TZDateTime.from(intendedTime, tz.local),
         notificationDetails: _quoteDetails(
           bigText: '"${quote.text}"\n\n— ${quote.author}',
         ),
@@ -344,7 +318,7 @@ class NotificationService {
       );
 
       debugPrint(
-        '[NotificationService] Scheduled Day $i for ${scheduleDate.toString()}',
+        '[NotificationService] Scheduled Day $i for ${intendedTime.toString()}',
       );
     }
     debugPrint(
@@ -368,15 +342,14 @@ class NotificationService {
 
     if (streak.lastOpenedDate == null) return;
 
-    final now = tz.TZDateTime.now(tz.local);
+    final now = DateTime.now();
     final lastOpen = StreakData.dateOnly(streak.lastOpenedDate!);
     final streakCount = streak.currentStreak;
     final scheduleMode = await _resolveScheduleMode();
 
-    // 1. Safety reminder at 8 PM the next day
+    // 1. Safety reminder at 8 PM the next day using Native DateTime
     //    e.g. opened Monday → reminder Tuesday 8 PM (4h before deadline)
-    final reminderTime = tz.TZDateTime(
-      tz.local,
+    final reminderTime = DateTime(
       lastOpen.year,
       lastOpen.month,
       lastOpen.day + 1, // next day
@@ -388,15 +361,14 @@ class NotificationService {
         id: _streakReminderId,
         title: _getReminderTitle(streakCount),
         body: _getReminderBody(streakCount),
-        scheduledDate: reminderTime,
+        scheduledDate: tz.TZDateTime.from(reminderTime, tz.local),
         notificationDetails: _alertDetails(),
         androidScheduleMode: scheduleMode,
       );
     }
 
     // 2. Streak-broken alert at 9 AM the day after the deadline (Emergency)
-    final breakTime = tz.TZDateTime(
-      tz.local,
+    final breakTime = DateTime(
       lastOpen.year,
       lastOpen.month,
       lastOpen.day + 2, // two days later
@@ -410,7 +382,7 @@ class NotificationService {
         body:
             'Your streak was lost to time yesterday. '
             'Relight the flame now to restore your progress.',
-        scheduledDate: breakTime,
+        scheduledDate: tz.TZDateTime.from(breakTime, tz.local),
         notificationDetails: _alertDetails(),
         androidScheduleMode: scheduleMode,
       );
@@ -455,8 +427,6 @@ class NotificationService {
         "Don't let $count days of wisdom slip away tonight!";
   }
 
-
-
   // ── Notification Details ─────────────────────────────────────────────────
 
   NotificationDetails _quoteDetails({String? bigText}) {
@@ -487,7 +457,6 @@ class NotificationService {
     );
   }
 
-  
   NotificationDetails _alertDetails() {
     return const NotificationDetails(
       android: AndroidNotificationDetails(

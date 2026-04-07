@@ -18,8 +18,8 @@ export const PhoneFrame: React.FC<PhoneFrameProps> = ({
   height = 700,
   style,
 }) => {
-  const bezelWidth = 10;
-  const borderRadius = 44;
+  const bezelWidth = 14; // Thicker bezels
+  const borderRadius = 48; // Slightly rounder to match thicker bezel
   const screenRadius = borderRadius - bezelWidth;
 
   return (
@@ -28,8 +28,8 @@ export const PhoneFrame: React.FC<PhoneFrameProps> = ({
         width,
         height,
         borderRadius,
-        background: `linear-gradient(145deg, #1a1a1a 0%, #0a0a0a 50%, #151515 100%)`,
-        border: `1px solid rgba(255,255,255,0.08)`,
+        background: `linear-gradient(145deg, #2a2a2a 0%, #111111 50%, #1f1f1f 100%)`, // Lighter phone body
+        border: `1.5px solid rgba(184, 134, 11, 0.35)`, // Subtle amber tint for visibility
         padding: bezelWidth,
         boxShadow: [
           `0 0 0 1px rgba(255,255,255,0.04)`,
