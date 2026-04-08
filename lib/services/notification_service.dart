@@ -81,9 +81,13 @@ class NotificationService {
   }
 
   Future<void> _setLocalTimezone() async {
-    final info = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(info.identifier));
-    debugPrint('[NotificationService] Timezone set to: ${info.identifier}');
+    final dynamic info = await FlutterTimezone.getLocalTimezone();
+    final String identifier = info is String
+        ? info
+        : (info as dynamic).identifier as String;
+
+    tz.setLocalLocation(tz.getLocation(identifier));
+    debugPrint('[NotificationService] Timezone set to: $identifier');
   }
 
   Future<void> _createAndroidChannels() async {
@@ -266,7 +270,7 @@ class NotificationService {
 
   // Quote of the Day
 
-  /// Schedules up to 7 days of quote notifications at 7 PM, using the user's
+  /// Schedules up to 7 days of quote notifications at 9 AM, using the user's
   /// filtered quote list. Cancels any previously scheduled batch first.
   Future<void> scheduleDailyQuotes(List<Quote> quotes) async {
     // 1. Cancel the old batch to avoid duplicates
@@ -286,31 +290,24 @@ class NotificationService {
     final count = pool.length < 7 ? pool.length : 7;
     final scheduleMode = await _resolveScheduleMode();
 
-    final now = DateTime.now();
+    final now = tz.TZDateTime.now(tz.local);
 
-    // 3. Find the first available 6:30 PM slot using Native DateTime
-    int startDayOffset = 0;
-    final today630pm = DateTime(now.year, now.month, now.day, 20, 20);
-    if (today630pm.isBefore(now)) {
-      startDayOffset = 1;
+    // 3. Temporary test slot: 5:05 AM local time (today if upcoming, else tomorrow)
+    var firstSlot = tz.TZDateTime(tz.local, now.year, now.month, now.day, 9);
+    if (firstSlot.isBefore(now)) {
+      firstSlot = firstSlot.add(const Duration(days: 1));
     }
 
     // 4. Schedule the rolling window
     for (var i = 0; i < count; i++) {
       final quote = pool[i];
-      final intendedTime = DateTime(
-        now.year,
-        now.month,
-        now.day + startDayOffset + i,
-        20,
-        20,
-      );
+      final scheduleDate = firstSlot.add(Duration(days: i));
 
       await _plugin.zonedSchedule(
         id: _dailyQuoteIdBase + i,
         title: 'Quote of the Day',
         body: '"${quote.text}" — ${quote.author}',
-        scheduledDate: tz.TZDateTime.from(intendedTime, tz.local),
+        scheduledDate: scheduleDate,
         notificationDetails: _quoteDetails(
           bigText: '"${quote.text}"\n\n— ${quote.author}',
         ),
@@ -318,7 +315,7 @@ class NotificationService {
       );
 
       debugPrint(
-        '[NotificationService] Scheduled Day $i for ${intendedTime.toString()}',
+        '[NotificationService] Scheduled Day $i for ${scheduleDate.toString()}',
       );
     }
     debugPrint(
@@ -342,14 +339,15 @@ class NotificationService {
 
     if (streak.lastOpenedDate == null) return;
 
-    final now = DateTime.now();
+    final now = tz.TZDateTime.now(tz.local);
     final lastOpen = StreakData.dateOnly(streak.lastOpenedDate!);
     final streakCount = streak.currentStreak;
     final scheduleMode = await _resolveScheduleMode();
 
-    // 1. Safety reminder at 8 PM the next day using Native DateTime
+    // 1. Safety reminder at 8 PM the next day
     //    e.g. opened Monday → reminder Tuesday 8 PM (4h before deadline)
-    final reminderTime = DateTime(
+    final reminderTime = tz.TZDateTime(
+      tz.local,
       lastOpen.year,
       lastOpen.month,
       lastOpen.day + 1, // next day
@@ -361,14 +359,15 @@ class NotificationService {
         id: _streakReminderId,
         title: _getReminderTitle(streakCount),
         body: _getReminderBody(streakCount),
-        scheduledDate: tz.TZDateTime.from(reminderTime, tz.local),
+        scheduledDate: reminderTime,
         notificationDetails: _alertDetails(),
         androidScheduleMode: scheduleMode,
       );
     }
 
-    // 2. Streak-broken alert at 9 AM the day after the deadline (Emergency)
-    final breakTime = DateTime(
+    // 2. Streak-broken alert at 9 PM the day after the deadline (Emergency)
+    final breakTime = tz.TZDateTime(
+      tz.local,
       lastOpen.year,
       lastOpen.month,
       lastOpen.day + 2, // two days later
@@ -382,7 +381,7 @@ class NotificationService {
         body:
             'Your streak was lost to time yesterday. '
             'Relight the flame now to restore your progress.',
-        scheduledDate: tz.TZDateTime.from(breakTime, tz.local),
+        scheduledDate: breakTime,
         notificationDetails: _alertDetails(),
         androidScheduleMode: scheduleMode,
       );
@@ -427,8 +426,57 @@ class NotificationService {
         "Don't let $count days of wisdom slip away tonight!";
   }
 
+  // Notification Details — Quiet (Quotes) vs. Loud (Alerts)
+
+  // ── Debug Testing ────────────────────────────────────────────────────────
+
+  /// Immediate fire of a "daily quote" style notification.
+  Future<void> testDailyQuote() async {
+    const testText = 'The only way to do great work is to love what you do.';
+    const testAuthor = 'Steve Jobs';
+    await _plugin.show(
+      id: 999,
+      title: 'Quote of the Day',
+      body: '"$testText" — $testAuthor',
+      notificationDetails: _quoteDetails(
+        bigText: '"$testText"\n\n— $testAuthor',
+      ),
+    );
+  }
+
+  /// Immediate fire of an 8 PM-style streak reminder.
+  Future<void> testStreakReminder() async {
+    await _plugin.show(
+      id: 998,
+      title: 'Keep the flame alive 🔥',
+      body: "Don't let your 7-day streak flicker out!",
+      notificationDetails: _alertDetails(),
+    );
+  }
+
+  /// Immediate fire of a 9 AM-style streak break alarm.
+  Future<void> testStreakBreak() async {
+    await _plugin.show(
+      id: 997,
+      title: 'The flame has gone out',
+      body:
+          'Your streak was lost to time yesterday. '
+          'Relight the flame now to restore your progress.',
+      notificationDetails: _alertDetails(),
+    );
+  }
+
+  /// Immediate fire of a success alert.
+  Future<void> testStreakRestored() async {
+    await showInstantAlert(
+      'Streak Restored!',
+      'You are back to a 7-day streak.',
+    );
+  }
+
   // ── Notification Details ─────────────────────────────────────────────────
 
+  /// Loud notification for daily quotes — heads-up, sound, and vibration.
   NotificationDetails _quoteDetails({String? bigText}) {
     return NotificationDetails(
       android: AndroidNotificationDetails(
@@ -457,6 +505,7 @@ class NotificationService {
     );
   }
 
+  /// Loud notification for streak alerts — heads-up, vibration, full priority.
   NotificationDetails _alertDetails() {
     return const NotificationDetails(
       android: AndroidNotificationDetails(

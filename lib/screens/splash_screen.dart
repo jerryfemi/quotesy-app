@@ -103,8 +103,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       ),
     );
 
-    _esyColorAnimation = ColorTween(begin: QColors.textPrimary, end: QColors.amberGlow)
-        .animate(
+    _esyColorAnimation =
+        ColorTween(begin: QColors.textPrimary, end: QColors.amberGlow).animate(
           CurvedAnimation(
             parent: _controller,
             curve: const Interval(0.56, 0.94, curve: Curves.easeInOutCubic),
@@ -239,7 +239,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                                   children: [
                                     const TextSpan(
                                       text: 'QUOT',
-                                      style: TextStyle(color: QColors.textPrimary),
+                                      style: TextStyle(
+                                        color: QColors.textPrimary,
+                                      ),
                                     ),
                                     TextSpan(
                                       text: 'ESY',

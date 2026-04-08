@@ -30,7 +30,11 @@ class Notifications {
         return false;
       }
 
-      await _sync(database: database, streak: streak);
+      await _sync(
+        database: database,
+        streak: streak,
+        forceRefreshQuotes: true,
+      );
       return true;
     } catch (error, stack) {
       debugPrint('[Notifications] initializeAndSync failed: $error\n$stack');
@@ -68,6 +72,7 @@ class Notifications {
   Future<void> _sync({
     required DatabaseService database,
     required StreakData streak,
+    bool forceRefreshQuotes = false,
   }) async {
     var quotes = database.getFilteredFeed(
       selectedCategories: database.getSelectedCategories(),
@@ -82,7 +87,11 @@ class Notifications {
     }
 
     final service = NotificationService();
-    await service.syncScheduledNotifications(quotes: quotes, streak: streak);
+    await service.syncScheduledNotifications(
+      quotes: quotes,
+      streak: streak,
+      forceRefreshQuotes: forceRefreshQuotes,
+    );
 
     final diagnostics = await service.getDiagnostics();
     debugPrint('[Notifications] Diagnostics start');
