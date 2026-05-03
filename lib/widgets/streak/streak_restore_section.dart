@@ -3,8 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
-import 'package:purchases_flutter/purchases_flutter.dart';
-
 import '../../services/notification_service.dart';
 import '../../models/streak_model.dart';
 import '../../theme/quotesy_theme.dart';
@@ -95,7 +93,7 @@ class _StreakRestoreSectionState extends ConsumerState<StreakRestoreSection> {
                       ),
                       const SizedBox(height: 16),
 
-                      // ── RevenueCat Payment Flow ──
+                      // ── Free Restore Flow ──
                       SizedBox(
                         width: double.infinity,
                         child: TextButton(
@@ -104,23 +102,10 @@ class _StreakRestoreSectionState extends ConsumerState<StreakRestoreSection> {
                               : () async {
                                   setState(() => _isProcessing = true);
                                   try {
-                                    // Initiate purchase of the streak repair consumable
-                                    final products =
-                                        await Purchases.getProducts(
-                                          ['streak_repair_99'],
-                                          productCategory:
-                                              ProductCategory.nonSubscription,
-                                        );
-                                    if (products.isEmpty) {
-                                      throw Exception('Product not found');
-                                    }
-                                    await Purchases.purchase(
-                                      PurchaseParams.storeProduct(
-                                        products.first,
-                                      ),
-                                    );
+                                    // Simulate processing delay
+                                    await Future.delayed(const Duration(milliseconds: 600));
 
-                                    // If execution reaches here, purchase was successful
+                                    // Execution successful
                                     if (mounted) {
                                       HapticFeedback.heavyImpact();
                                       setState(() {
@@ -145,25 +130,19 @@ class _StreakRestoreSectionState extends ConsumerState<StreakRestoreSection> {
                                         );
                                       }
                                     }
-                                  } on PlatformException catch (e) {
-                                    var errorCode =
-                                        PurchasesErrorHelper.getErrorCode(e);
-                                    if (errorCode !=
-                                        PurchasesErrorCode
-                                            .purchaseCancelledError) {
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Purchase failed. Please try again.',
-                                            ),
-                                            backgroundColor: QColors.danger,
-                                            behavior: SnackBarBehavior.floating,
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: const Text(
+                                            'Restore failed. Please try again.',
                                           ),
-                                        );
-                                      }
+                                          backgroundColor: QColors.danger,
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
                                     }
                                   } finally {
                                     if (mounted && !_showSuccess) {
@@ -193,7 +172,7 @@ class _StreakRestoreSectionState extends ConsumerState<StreakRestoreSection> {
                                   ),
                                 )
                               : const Text(
-                                  'Restore streak · \$0.99',
+                                  'Restore streak',
                                   style: TextStyle(
                                     fontFamily: 'Inter',
                                     fontSize: 14,

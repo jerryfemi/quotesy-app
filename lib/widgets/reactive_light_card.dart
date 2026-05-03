@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import '../models/category_style.dart';
 import '../theme/quotesy_theme.dart';
 
-
-
 class ReactiveLightCard extends StatelessWidget {
   final CategoryStyle style;
   final double focusAmount; // 0.0 = off-screen, 1.0 = dead center
@@ -35,6 +33,7 @@ class ReactiveLightCard extends StatelessWidget {
 
     // Subtitle: smoothly appears once focus crosses the reveal threshold.
     final subtitleVisibility = ((focusAmount - 0.35) / 0.25).clamp(0.0, 1.0);
+    final subtitleYOffset = (1.0 - subtitleVisibility) * 6.0;
 
     return RepaintBoundary(
       child: Container(
@@ -53,74 +52,72 @@ class ReactiveLightCard extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               // ── LIGHT LAYERS ─────────────────────────────────────────────
-              Stack(
-                fit: StackFit.expand,
-                children: style.lightLayers
-                    .map(
-                      (layer) => DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: _gradientWithOpacity(
-                            layer.gradient,
-                            lightOpacity,
+              RepaintBoundary(
+                child: Opacity(
+                  opacity: lightOpacity,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: style.lightLayers
+                        .map(
+                          (layer) => DecoratedBox(
+                            decoration: BoxDecoration(gradient: layer.gradient),
                           ),
-                        ),
-                      ),
-                    )
-                    .toList(),
+                        )
+                        .toList(growable: false),
+                  ),
+                ),
               ),
 
               // ── CONTENT ─────────────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Tag — small tracked caps, brightens with focus
-                    Text(
-                      style.tagLine,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontFamily: 'Playfair Display',
-                        letterSpacing: 1.6,
-                        color: QColors.textPrimary.withValues(
-                          alpha: 0.30 + (0.35 * glowFocus),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // Title — Playfair, brightens with focus
-                    Text(
-                      style.displayTitle,
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        color: QColors.textPrimary.withValues(
-                          alpha: 0.55 + (0.45 * glowFocus),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-                    AnimatedSlide(
-                      offset: Offset(0, (1.0 - subtitleVisibility) * 0.2),
-                      duration: const Duration(milliseconds: 140),
-                      curve: Curves.easeOut,
-                      child: AnimatedOpacity(
-                        opacity: subtitleVisibility,
-                        duration: const Duration(milliseconds: 140),
-                        curve: Curves.easeOut,
-                        child: Text(
-                          style.subtitle,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontStyle: FontStyle.italic,
-                            color: QColors.textMuted,
+              RepaintBoundary(
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Tag — small tracked caps, brightens with focus
+                      Text(
+                        style.tagLine,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontFamily: 'Playfair Display',
+                          letterSpacing: 1.6,
+                          color: QColors.textPrimary.withValues(
+                            alpha: 0.30 + (0.35 * glowFocus),
                           ),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
-                  ],
+
+                      const SizedBox(height: 10),
+
+                      // Title — Playfair, brightens with focus
+                      Text(
+                        style.displayTitle,
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          color: QColors.textPrimary.withValues(
+                            alpha: 0.55 + (0.45 * glowFocus),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+                      Opacity(
+                        opacity: subtitleVisibility,
+                        child: Transform.translate(
+                          offset: Offset(0, subtitleYOffset),
+                          child: Text(
+                            style.subtitle,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontStyle: FontStyle.italic,
+                              color: QColors.textMuted,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -128,49 +125,5 @@ class ReactiveLightCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Gradient _gradientWithOpacity(Gradient gradient, double opacity) {
-    final adjustedColors = gradient.colors
-        .map((color) => color.withValues(alpha: color.a * opacity))
-        .toList(growable: false);
-
-    if (gradient is RadialGradient) {
-      return RadialGradient(
-        center: gradient.center,
-        radius: gradient.radius,
-        colors: adjustedColors,
-        stops: gradient.stops,
-        focal: gradient.focal,
-        focalRadius: gradient.focalRadius,
-        tileMode: gradient.tileMode,
-        transform: gradient.transform,
-      );
-    }
-
-    if (gradient is LinearGradient) {
-      return LinearGradient(
-        begin: gradient.begin,
-        end: gradient.end,
-        colors: adjustedColors,
-        stops: gradient.stops,
-        tileMode: gradient.tileMode,
-        transform: gradient.transform,
-      );
-    }
-
-    if (gradient is SweepGradient) {
-      return SweepGradient(
-        center: gradient.center,
-        startAngle: gradient.startAngle,
-        endAngle: gradient.endAngle,
-        colors: adjustedColors,
-        stops: gradient.stops,
-        tileMode: gradient.tileMode,
-        transform: gradient.transform,
-      );
-    }
-
-    return gradient;
   }
 }

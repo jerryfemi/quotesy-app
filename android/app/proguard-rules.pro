@@ -4,3 +4,7 @@
 # Keep Flutter entry points and Android components.
 -keep class io.flutter.embedding.** { *; }
 -dontwarn es.antonborri.home_widget.**
+
+# Ignore missing Play Core classes (handled by split libraries or unused)
+-dontwarn com.google.android.play.core.**
+

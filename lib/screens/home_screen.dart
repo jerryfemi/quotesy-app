@@ -24,18 +24,16 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
-  with WidgetsBindingObserver {
+    with WidgetsBindingObserver {
   final _pageController = PageController();
   ProviderSubscription<AsyncValue<List<Quote>>>? _feedSubscription;
   static const int _narrowFeedThreshold = 20;
   int _currentIndex = 0;
   bool _feedResetQueued = false;
   bool _showGhostHint = false;
-  double _ghostHintOpacity = 0.0;
   bool _hintSeenMarked = false;
   Timer? _hintRevealTimer;
   Timer? _hintAutoFadeTimer;
-  Timer? _hintRemoveTimer;
 
   @override
   void initState() {
@@ -77,7 +75,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _feedSubscription?.close();
     _hintRevealTimer?.cancel();
     _hintAutoFadeTimer?.cancel();
-    _hintRemoveTimer?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -92,7 +89,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
       await Notifications().resyncIfNeeded(database: db, streak: streak);
     } catch (error, stack) {
-      debugPrint('Resume notification sync failed (continuing): $error\n$stack');
+      debugPrint(
+        'Resume notification sync failed (continuing): $error\n$stack',
+      );
     }
   }
 
@@ -102,19 +101,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (service.hasSeenHomeGestureHint()) return;
     if (!mounted) return;
 
-    setState(() {
-      _showGhostHint = true;
-      _ghostHintOpacity = 0.0;
-    });
-
     _hintRevealTimer?.cancel();
-    _hintRevealTimer = Timer(const Duration(milliseconds: 500), () {
-      if (!mounted || !_showGhostHint) return;
-      setState(() => _ghostHintOpacity = 0.5);
+    _hintRevealTimer = Timer(const Duration(milliseconds: 1000), () {
+      if (!mounted) return;
+      setState(() => _showGhostHint = true);
     });
 
     _hintAutoFadeTimer?.cancel();
-    _hintAutoFadeTimer = Timer(const Duration(seconds: 4), () {
+    _hintAutoFadeTimer = Timer(const Duration(seconds: 8), () {
       _dismissGhostHint();
     });
   }
@@ -126,7 +120,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _dismissGhostHint() async {
-    if (!_showGhostHint && _ghostHintOpacity == 0) {
+    if (!_showGhostHint) {
       await _markHintSeenIfNeeded();
       return;
     }
@@ -134,15 +128,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _hintRevealTimer?.cancel();
     _hintAutoFadeTimer?.cancel();
 
-    if (mounted && _ghostHintOpacity != 0) {
-      setState(() => _ghostHintOpacity = 0.0);
-    }
-
-    _hintRemoveTimer?.cancel();
-    _hintRemoveTimer = Timer(const Duration(milliseconds: 900), () {
-      if (!mounted) return;
+    if (mounted) {
       setState(() => _showGhostHint = false);
-    });
+    }
 
     await _markHintSeenIfNeeded();
   }
@@ -245,30 +233,107 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
         _NarrowFeedHint(quoteCount: quotes.length),
 
-        if (_showGhostHint)
-          Positioned(
-            left: 20,
-            right: 20,
-            bottom: 250,
-            child: IgnorePointer(
-              child: AnimatedOpacity(
-                opacity: _ghostHintOpacity,
-                duration: const Duration(seconds: 5),
-                curve: Curves.easeOut,
-                child: const Text(
-                  'Double-tap to save  •  Long-press to share',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: QColors.amber,
-                    fontFamily: 'Inter',
-                    fontStyle: FontStyle.italic,
-                    letterSpacing: 1.2,
-                    fontSize: 12,
+        // Slide-up Hint Card
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeOutCubic,
+          left: 20,
+          right: 20,
+          // If showing, sit nicely above the bottom nav. If not, hide it off-screen.
+          bottom: _showGhostHint ? 120 : -500,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+            decoration: BoxDecoration(
+              color: QColors.surface,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: QColors.borderMid, width: 1),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black54,
+                  blurRadius: 30,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Small drag handle pill at the top
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: QColors.borderMid,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
+                // Icon
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: QColors.amberGlow.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.swipe_up_rounded,
+                    color: QColors.amberGlow,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Title
+                const Text(
+                  'Welcome to Quotesy',
+                  style: TextStyle(
+                    fontFamily: 'Playfair Display',
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: QColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Instructions
+                const Text(
+                  'Swipe up to explore.\nDouble-tap to save. Long-press to share.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    height: 1.5,
+                    color: QColors.textSubtle,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // Dismiss Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _dismissGhostHint,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: QColors.obsidian,
+                      foregroundColor: QColors.textPrimary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        side: const BorderSide(color: QColors.borderMid),
+                      ),
+                    ),
+                    child: const Text(
+                      'Got it',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
+        ),
       ],
     );
   }
@@ -417,26 +482,30 @@ class _StreakIndicator extends ConsumerWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                    Icons.local_fire_department_rounded,
-                    color: QColors.amberGlow,
-                    size: 18,
-                  )
-                  .animate(
-                    onPlay: (controller) => controller.repeat(reverse: true),
-                  )
-                  .scaleXY(
-                    begin: 1.0,
-                    end: 1.18,
-                    duration: 1500.ms,
-                    curve: Curves.easeInOut,
-                  )
-                  .fade(
-                    begin: 0.75,
-                    end: 1.0,
-                    duration: 1500.ms,
-                    curve: Curves.easeInOut,
-                  ),
+              RepaintBoundary(
+                child:
+                    const Icon(
+                          Icons.local_fire_department_rounded,
+                          color: QColors.amberGlow,
+                          size: 18,
+                        )
+                        .animate(
+                          onPlay: (controller) =>
+                              controller.repeat(reverse: true),
+                        )
+                        .scaleXY(
+                          begin: 1.0,
+                          end: 1.18,
+                          duration: 1500.ms,
+                          curve: Curves.easeInOut,
+                        )
+                        .fade(
+                          begin: 0.75,
+                          end: 1.0,
+                          duration: 1500.ms,
+                          curve: Curves.easeInOut,
+                        ),
+              ),
               const SizedBox(width: 5),
               Text(
                 '$displayStreak',

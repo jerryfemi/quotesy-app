@@ -101,12 +101,12 @@ class StreakSheet extends ConsumerWidget {
                     const SizedBox(height: 24),
                     const StreakSheetDivider(),
                     const SizedBox(height: 24),
-                    if (streak.canRestore) ...[
+                    /* if (streak.canRestore) ...[
                       StreakRestoreSection(streak: streak),
                       const SizedBox(height: 24),
                       const StreakSheetDivider(),
                       const SizedBox(height: 24),
-                    ],
+                    ], */
                     StreakRulesSection(isActive: !isLostVisually),
                     if (kDebugMode && !streak.canRestore) ...[
                       const SizedBox(height: 32),

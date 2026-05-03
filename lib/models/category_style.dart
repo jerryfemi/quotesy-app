@@ -41,6 +41,7 @@ class CategoryStyle {
   const CategoryStyle({
     required this.categoryName,
     required this.displayTitle,
+    
     required this.tagLine,
     required this.subtitle,
     required this.primaryColor,

@@ -263,17 +263,6 @@ class _CategoryFilterTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isSelected = prefsState.selectedCategories.contains(category);
-    final asyncAuthors = ref.watch(topAuthorsByCategoryProvider(category));
-    final topAuthors = asyncAuthors.maybeWhen(
-      data: (value) => value,
-      orElse: () => const <String>[],
-    );
-    final selectedSubset = prefsState.selectedAuthors[category];
-    final selectedAuthors = !isSelected
-        ? <String>{}
-        : (selectedSubset == null
-              ? topAuthors.toSet()
-              : selectedSubset.toSet());
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
@@ -306,50 +295,80 @@ class _CategoryFilterTile extends ConsumerWidget {
             curve: Curves.easeOutCubic,
             alignment: Alignment.topCenter,
             child: isExpanded
-                ? Padding(
-                    padding: const EdgeInsets.fromLTRB(34, 6, 0, 2),
-                    child: asyncAuthors.isLoading
-                        ? const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 10),
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: QColors.textSubtle,
-                              ),
-                            ),
-                          )
-                        : topAuthors.isEmpty
-                        ? const Padding(
-                            padding: EdgeInsets.only(bottom: 10),
-                            child: Text(
-                              'No high-frequency authors in this category yet.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: QColors.textSubtle,
-                              ),
-                            ),
-                          )
-                        : Column(
-                            children: topAuthors
-                                .map(
-                                  (author) => _AuthorRow(
-                                    author: author,
-                                    isSelected: selectedAuthors.contains(
-                                      author,
-                                    ),
-                                    onToggle: () =>
-                                        onToggleAuthor(topAuthors, author),
-                                  ),
-                                )
-                                .toList(growable: false),
-                          ),
+                ? _ExpandedAuthorsSection(
+                    category: category,
+                    isSelected: isSelected,
+                    selectedSubset: prefsState.selectedAuthors[category],
+                    onToggleAuthor: onToggleAuthor,
                   )
                 : const SizedBox.shrink(),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ExpandedAuthorsSection extends ConsumerWidget {
+  const _ExpandedAuthorsSection({
+    required this.category,
+    required this.isSelected,
+    required this.selectedSubset,
+    required this.onToggleAuthor,
+  });
+
+  final String category;
+  final bool isSelected;
+  final List<String>? selectedSubset;
+  final void Function(List<String> topAuthors, String author) onToggleAuthor;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncAuthors = ref.watch(topAuthorsByCategoryProvider(category));
+    final topAuthors = asyncAuthors.maybeWhen(
+      data: (value) => value,
+      orElse: () => const <String>[],
+    );
+
+    final selectedAuthors = !isSelected
+        ? <String>{}
+        : (selectedSubset == null
+              ? topAuthors.toSet()
+              : selectedSubset!.toSet());
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(34, 6, 0, 2),
+      child: asyncAuthors.isLoading
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: QColors.textSubtle,
+                ),
+              ),
+            )
+          : topAuthors.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.only(bottom: 10),
+              child: Text(
+                'No high-frequency authors in this category yet.',
+                style: TextStyle(fontSize: 12, color: QColors.textSubtle),
+              ),
+            )
+          : Column(
+              children: topAuthors
+                  .map(
+                    (author) => _AuthorRow(
+                      author: author,
+                      isSelected: selectedAuthors.contains(author),
+                      onToggle: () => onToggleAuthor(topAuthors, author),
+                    ),
+                  )
+                  .toList(growable: false),
+            ),
     );
   }
 }
@@ -478,8 +497,7 @@ class _CircleCheck extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
+    return Container(
       width: 22,
       height: 22,
       decoration: BoxDecoration(
