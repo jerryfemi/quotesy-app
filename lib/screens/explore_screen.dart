@@ -67,10 +67,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
             style: Theme.of(context).textTheme.headlineMedium,
         ),
       ),
-      body: Listener(
-        onPointerMove: (e) => nav.onDrag(e.delta.dy),
-        onPointerUp: (_) => nav.onDragEnd(),
-        onPointerCancel: (_) => nav.onDragEnd(),
+      body: NotificationListener<ScrollNotification>(
+        onNotification: nav.onScroll,
         child: LayoutBuilder(
           builder: (context, constraints) {
             final isWide = constraints.maxWidth >= 900;

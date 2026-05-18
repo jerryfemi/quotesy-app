@@ -1,6 +1,173 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../routes/navigation_shell.dart';
+import '../theme/quotesy_theme.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NavBarController
+//
+// ChangeNotifier that owns hide/show state, driven by ScrollNotifications.
+// Dead-zone accumulator prevents jitter from micro scroll deltas.
+// ─────────────────────────────────────────────────────────────────────────────
+class NavBarController extends ChangeNotifier {
+  bool _visible = true;
+  double _accumulator = 0.0;
+  static const double _deadZone = 8.0;
+
+  bool get visible => _visible;
+
+  bool onScroll(ScrollNotification notification) {
+    if (notification is ScrollEndNotification) {
+      _accumulator = 0.0;
+      return false;
+    }
+
+    if (notification is ScrollUpdateNotification) {
+      final delta = notification.scrollDelta ?? 0.0;
+      if (delta == 0.0) return false;
+
+      _accumulator += delta;
+      if (_accumulator > _deadZone) {
+        _accumulator = 0.0;
+        if (_visible) {
+          _visible = false;
+          notifyListeners();
+        }
+      } else if (_accumulator < -_deadZone) {
+        _accumulator = 0.0;
+        if (!_visible) {
+          _visible = true;
+          notifyListeners();
+        }
+      }
+    }
+
+    return false;
+  }
+
+  void show() {
+    if (!_visible) {
+      _visible = true;
+      notifyListeners();
+    }
+  }
+
+  void hide() {
+    if (_visible) {
+      _visible = false;
+      notifyListeners();
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NavBarControllerScope
+// ─────────────────────────────────────────────────────────────────────────────
+class NavBarControllerScope extends InheritedNotifier<NavBarController> {
+  const NavBarControllerScope({
+    super.key,
+    required NavBarController controller,
+    required super.child,
+  }) : super(notifier: controller);
+
+  static NavBarController of(BuildContext context) {
+    final scope = context
+        .dependOnInheritedWidgetOfExactType<NavBarControllerScope>();
+    assert(scope != null, 'NavBarControllerScope missing from widget tree.');
+    return scope!.notifier!;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QuotesyShell
+// ─────────────────────────────────────────────────────────────────────────────
+class QuotesyShell extends StatefulWidget {
+  final StatefulNavigationShell navigationShell;
+  const QuotesyShell({super.key, required this.navigationShell});
+
+  @override
+  State<QuotesyShell> createState() => _QuotesyShellState();
+}
+
+class _QuotesyShellState extends State<QuotesyShell> {
+  final NavBarController _navBarController = NavBarController();
+
+  @override
+  void dispose() {
+    _navBarController.dispose();
+    super.dispose();
+  }
+
+  void _onTabTapped(int index) {
+    widget.navigationShell.goBranch(
+      index,
+      initialLocation: index == widget.navigationShell.currentIndex,
+    );
+    _navBarController.show();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NavBarControllerScope(
+      controller: _navBarController,
+      child: Scaffold(
+        backgroundColor: QNavColors.shellBackground,
+        extendBody: true,
+        body: Stack(
+          children: [
+            widget.navigationShell,
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _NavBarConsumer(
+                currentIndex: widget.navigationShell.currentIndex,
+                onTap: _onTabTapped,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavBarConsumer extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+
+  const _NavBarConsumer({required this.currentIndex, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = NavBarControllerScope.of(context).visible;
+    return AnimatedSlide(
+      offset: visible ? Offset.zero : const Offset(0, 1.2),
+      duration: const Duration(milliseconds: 220),
+      curve: visible ? Curves.easeOutCubic : Curves.easeInCubic,
+      child: AnimatedOpacity(
+        opacity: visible ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 180),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: NavBar(currentIndex: currentIndex, onTap: onTap),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/*
+Previous implementation (commented out as requested)
+
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:quotesy/routes/navigation_shell.dart';
 import '../theme/quotesy_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -90,7 +257,6 @@ class QuotesyShell extends StatefulWidget {
 }
 
 class _QuotesyShellState extends State<QuotesyShell> {
- 
   final NavBarController _navBarController = NavBarController();
 
   @override
@@ -121,7 +287,7 @@ class _QuotesyShellState extends State<QuotesyShell> {
               left: 0,
               right: 0,
               bottom: 0,
-          
+
               child: _NavBarConsumer(
                 currentIndex: widget.navigationShell.currentIndex,
                 onTap: _onTabTapped,
@@ -134,7 +300,6 @@ class _QuotesyShellState extends State<QuotesyShell> {
   }
 }
 
-
 class _NavBarConsumer extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -144,14 +309,9 @@ class _NavBarConsumer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visible = NavBarControllerScope.of(context).visible;
-    return QuotesyNavBar(
-      currentIndex: currentIndex,
-      onTap: onTap,
-      visible: visible,
-    );
+    return NavBar(currentIndex: currentIndex,onTap: onTap );
   }
 }
-
 
 class QuotesyNavBar extends StatelessWidget {
   final int currentIndex;
@@ -203,7 +363,6 @@ class QuotesyNavBar extends StatelessWidget {
                           color: QNavColors.pillBorder,
                           width: 1,
                         ),
-                       
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -275,7 +434,9 @@ class QuotesyNavBar extends StatelessWidget {
                               // Amber glow only animates when saved
                               if (t > 0)
                                 BoxShadow(
-                                  color: QNavColors.accent.withValues(alpha: 0.15 * t),
+                                  color: QNavColors.accent.withValues(
+                                    alpha: 0.15 * t,
+                                  ),
                                   blurRadius: 12,
                                   spreadRadius: -2,
                                 ),
@@ -284,7 +445,11 @@ class QuotesyNavBar extends StatelessWidget {
                           child: Icon(
                             Icons.bookmark_outline_rounded,
                             size: 20,
-                            color: Color.lerp(QNavColors.inactive, QNavColors.accentGlow, t),
+                            color: Color.lerp(
+                              QNavColors.inactive,
+                              QNavColors.accentGlow,
+                              t,
+                            ),
                           ),
                         );
                       },
@@ -362,3 +527,5 @@ class _PillTabButton extends StatelessWidget {
     );
   }
 }
+
+*/

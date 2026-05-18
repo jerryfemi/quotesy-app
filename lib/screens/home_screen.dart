@@ -194,10 +194,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     return Stack(
       children: [
-        Listener(
-          onPointerMove: (e) => nav.onDrag(e.delta.dy),
-          onPointerUp: (_) => nav.onDragEnd(),
-          onPointerCancel: (_) => nav.onDragEnd(),
+        NotificationListener<ScrollNotification>(
+          onNotification: nav.onScroll,
           child: PageView.builder(
             controller: _pageController,
             scrollDirection: Axis.vertical,

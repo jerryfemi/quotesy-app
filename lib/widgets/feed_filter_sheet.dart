@@ -45,7 +45,7 @@ class FeedFilterSheet extends ConsumerStatefulWidget {
 }
 
 class _FeedFilterSheetState extends ConsumerState<FeedFilterSheet> {
-  static const double _collapsedSnap = 0.52;
+  static const double _collapsedSnap = 0.62;
   static const double _expandedSnap = 0.85;
 
   final Set<String> _expandedCategories = <String>{};

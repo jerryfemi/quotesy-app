@@ -14,7 +14,7 @@ final routerProvider = GoRouter(
     GoRoute(path: '/', redirect: (_, _) => '/splash'),
     GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
 
-    StatefulShellRoute.indexedStack(
+    StatefulShellRoute.indexedStack( 
       builder: (context, state, navigationShell) =>
           QuotesyShell(navigationShell: navigationShell),
       branches: [
@@ -25,7 +25,7 @@ final routerProvider = GoRouter(
         ),
         StatefulShellBranch(
           routes: [
-            GoRoute(path: '/explore', builder: (_, _) => const ExploreScreen()),
+            GoRoute(path: '/explore', builder: (_, _) => const ExploreScreen(),),
           ],
         ),
         StatefulShellBranch(
@@ -36,7 +36,7 @@ final routerProvider = GoRouter(
       ],
     ),
     GoRoute(
-      path: '/category/:name',
+      path: '/category/:name',        
       builder: (context, state) {
         final encoded = state.pathParameters['name'] ?? '';
         final category = Uri.decodeComponent(encoded);
