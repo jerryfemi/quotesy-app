@@ -1,6 +1,7 @@
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'routes/app_router.dart';
@@ -30,7 +31,18 @@ class QuotesyApp extends StatelessWidget {
       title: 'Quotesy',
       debugShowCheckedModeBanner: false,
       locale: DevicePreview.locale(context),
-      builder: DevicePreview.appBuilder,
+      builder: (context, child) {
+        final preview = DevicePreview.appBuilder(context, child);
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+            systemNavigationBarColor: QColors.obsidian,
+            systemNavigationBarIconBrightness: Brightness.light,
+          ),
+          child: preview,
+        );
+      },
       theme: darkMode,
       routerConfig: routerProvider,
     );
