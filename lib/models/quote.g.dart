@@ -8,7 +8,7 @@ part of 'quote.dart';
 
 class QuoteAdapter extends TypeAdapter<Quote> {
   @override
-  final int typeId = 0;
+  final typeId = 0;
 
   @override
   Quote read(BinaryReader reader) {
