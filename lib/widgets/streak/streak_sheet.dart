@@ -6,7 +6,6 @@ import '../../models/streak_model.dart';
 import '../../theme/quotesy_theme.dart';
 import '../quotesy_nav_bar.dart';
 import 'streak_hero_block.dart';
-import 'streak_restore_section.dart';
 import 'streak_reusables.dart';
 import 'streak_week_section.dart';
 
