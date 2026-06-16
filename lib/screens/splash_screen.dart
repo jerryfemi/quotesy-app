@@ -17,8 +17,8 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerProviderStateMixin {
-  static const _animationDuration = Duration(milliseconds: 2000);
-  static const _minimumVisibleDuration = Duration(milliseconds: 2500);
+  static const _animationDuration = Duration(milliseconds: 1500);
+  static const _minimumVisibleDuration = Duration(milliseconds: 1900);
 
   late final AnimationController _controller;
   late final Animation<double> _fadeAnimation;
