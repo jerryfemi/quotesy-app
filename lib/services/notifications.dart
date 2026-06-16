@@ -93,20 +93,6 @@ class Notifications {
       forceRefreshQuotes: forceRefreshQuotes,
     );
 
-    final diagnostics = await service.getDiagnostics();
-    debugPrint('[Notifications] Diagnostics start');
-    debugPrint('[Notifications] enabled=${diagnostics.notificationsEnabled}');
-    debugPrint('[Notifications] canExact=${diagnostics.canScheduleExact}');
-    debugPrint('[Notifications] mode=${diagnostics.scheduleMode}');
-    debugPrint('[Notifications] pendingTotal=${diagnostics.pendingCount}');
-    debugPrint(
-      '[Notifications] dailyQuotePending=${diagnostics.dailyQuotePendingCount}',
-    );
-    for (final item in diagnostics.pendingSummary) {
-      debugPrint('[Notifications] $item');
-    }
-    debugPrint('[Notifications] Diagnostics end');
-
     _lastSyncAt = DateTime.now();
   }
 }

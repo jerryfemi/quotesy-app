@@ -10,24 +10,6 @@ import '../models/quote.dart';
 import '../models/streak_model.dart';
 import '../theme/quotesy_theme.dart';
 
-class NotificationDiagnostics {
-  const NotificationDiagnostics({
-    required this.notificationsEnabled,
-    required this.canScheduleExact,
-    required this.scheduleMode,
-    required this.pendingCount,
-    required this.dailyQuotePendingCount,
-    required this.pendingSummary,
-  });
-
-  final bool? notificationsEnabled;
-  final bool? canScheduleExact;
-  final AndroidScheduleMode scheduleMode;
-  final int pendingCount;
-  final int dailyQuotePendingCount;
-  final List<String> pendingSummary;
-}
-
 /// Central notification engine for Quotesy.
 ///
 /// Singleton — call `NotificationService()` anywhere to get the same instance.
@@ -44,8 +26,9 @@ class NotificationService {
   static const _streakReminderId = 200;
   static const _streakBreakId = 201;
   static const _instantAlertId = 300;
+  static const _testQuoteId = 900;
 
-  // Channels — Dark Academia/Obsidian Naming
+  // Channels
   static const _quoteChannelId = 'quotesy_daily_quote';
   static const _quoteChannelName = 'Daily Quote';
   static const _quoteChannelDesc = 'Your daily dose of inspiration.';
@@ -121,44 +104,45 @@ class NotificationService {
     );
   }
 
-  /// Request POST_NOTIFICATIONS permission (Android 13+).
+  /// Request notification permissions (Android 13+ and iOS/macOS).
   Future<bool> requestPermissions() async {
     final android = _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
+    final ios = _plugin
+        .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >();
 
-    // On older Android versions this may return null because runtime
-    // notification permission is not required.
-    final notificationsGranted =
-        await android?.requestNotificationsPermission() ?? true;
-
-    // Exact alarms are needed because quote/streak schedules use
-    // AndroidScheduleMode.exactAllowWhileIdle when available.
-    var exactAlarmGranted = true;
     if (android != null) {
+      final granted =
+          await android.requestNotificationsPermission() ?? true;
+
       try {
         final canExact = await (android as dynamic)
             .canScheduleExactNotifications();
         if (canExact == false) {
-          exactAlarmGranted =
-              await (android as dynamic).requestExactAlarmsPermission() == true;
+          await (android as dynamic).requestExactAlarmsPermission();
         }
-      } catch (e) {
-        // Some plugin/platform combinations may not expose exact-alarm APIs.
-        debugPrint(
-          '[NotificationService] Exact alarm permission APIs unavailable: $e',
-        );
-      }
+      } catch (_) {}
+
+      debugPrint('[NotificationService] Android permissions granted=$granted');
+      return granted;
     }
 
-    debugPrint(
-      '[NotificationService] Permission status '
-      '(notifications=$notificationsGranted, exactAlarms=$exactAlarmGranted)',
-    );
-    // Scheduling can still work with inexact mode when exact alarms are denied,
-    // so this return value reflects notification visibility permission only.
-    return notificationsGranted;
+    if (ios != null) {
+      final granted = await ios.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+      ) ?? false;
+
+      debugPrint('[NotificationService] iOS permissions granted=$granted');
+      return granted;
+    }
+
+    return true;
   }
 
   Future<AndroidScheduleMode> _resolveScheduleMode() async {
@@ -173,70 +157,15 @@ class NotificationService {
       final canExact = await (android as dynamic)
           .canScheduleExactNotifications();
       if (canExact == false) {
-        debugPrint(
-          '[NotificationService] Exact alarms not permitted, using inexact scheduling.',
-        );
         return AndroidScheduleMode.inexactAllowWhileIdle;
       }
-    } catch (_) {
-      // If platform does not expose exact-alarm checks, keep existing behavior.
-    }
+    } catch (_) {}
 
     return AndroidScheduleMode.exactAllowWhileIdle;
   }
 
-  Future<NotificationDiagnostics> getDiagnostics() async {
-    final pending = await _plugin.pendingNotificationRequests();
-    final android = _plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
-
-    bool? notificationsEnabled;
-    bool? canScheduleExact;
-
-    if (android != null) {
-      try {
-        notificationsEnabled = await (android as dynamic)
-            .areNotificationsEnabled();
-      } catch (_) {
-        notificationsEnabled = null;
-      }
-
-      try {
-        canScheduleExact = await (android as dynamic)
-            .canScheduleExactNotifications();
-      } catch (_) {
-        canScheduleExact = null;
-      }
-    }
-
-    final dailyQuotePendingCount = pending
-        .where((n) => n.id >= _dailyQuoteIdBase && n.id < _dailyQuoteIdBase + 7)
-        .length;
-    final scheduleMode = await _resolveScheduleMode();
-
-    final pendingSummary = pending
-        .map((n) {
-          final title = n.title ?? '(no title)';
-          return '#${n.id}: $title';
-        })
-        .toList(growable: false);
-
-    return NotificationDiagnostics(
-      notificationsEnabled: notificationsEnabled,
-      canScheduleExact: canScheduleExact,
-      scheduleMode: scheduleMode,
-      pendingCount: pending.length,
-      dailyQuotePendingCount: dailyQuotePendingCount,
-      pendingSummary: pendingSummary,
-    );
-  }
-
   // Reschedule-on-Open
 
-  /// Checks whether the quote-of-the-day queue is empty (e.g. after a reboot)
-  /// and rebuilds it from the provided [quotes] and [streak] data.
   /// Ensures the 7-day quote queue is full and streak reminders are current.
   /// Called on app start in the splash screen.
   Future<void> syncScheduledNotifications({
@@ -248,8 +177,6 @@ class NotificationService {
     final dailyQuotesCount = pending
         .where((n) => n.id >= _dailyQuoteIdBase && n.id < _dailyQuoteIdBase + 7)
         .length;
-
-    // If we have fewer than 7 days of quotes queued, top it up.
 
     if (forceRefreshQuotes || dailyQuotesCount < 7) {
       debugPrint(
@@ -263,8 +190,6 @@ class NotificationService {
       );
     }
 
-    // Always refresh streak reminders on cold-start so they track the latest
-    // lastOpenedDate (which just got updated by StreakNotifier.recordOpen).
     await scheduleStreakReminders(streak);
   }
 
@@ -273,7 +198,6 @@ class NotificationService {
   /// Schedules up to 7 days of quote notifications at 9 AM, using the user's
   /// filtered quote list. Cancels any previously scheduled batch first.
   Future<void> scheduleDailyQuotes(List<Quote> quotes) async {
-    // 1. Cancel the old batch to avoid duplicates
     for (var i = 0; i < 7; i++) {
       await _plugin.cancel(id: _dailyQuoteIdBase + i);
     }
@@ -285,20 +209,17 @@ class NotificationService {
       return;
     }
 
-    // 2. Shuffle and pick up to 7
     final pool = List<Quote>.from(quotes)..shuffle(Random());
     final count = pool.length < 7 ? pool.length : 7;
     final scheduleMode = await _resolveScheduleMode();
 
     final now = tz.TZDateTime.now(tz.local);
 
-    // 3. Temporary test slot: 5:05 AM local time (today if upcoming, else tomorrow)
     var firstSlot = tz.TZDateTime(tz.local, now.year, now.month, now.day, 9);
     if (firstSlot.isBefore(now)) {
       firstSlot = firstSlot.add(const Duration(days: 1));
     }
 
-    // 4. Schedule the rolling window
     for (var i = 0; i < count; i++) {
       final quote = pool[i];
       final scheduleDate = firstSlot.add(Duration(days: i));
@@ -329,9 +250,6 @@ class NotificationService {
   ///   • **8 PM next day** — "Protect your flame" (escalating tone)
   ///   • **9 AM day after** — "Streak broken" alert
   ///
-  /// Uses fixed clock times (not raw offsets) because the streak model
-  /// stores `lastOpenedDate` as date-only (midnight).
-  ///
   /// Safe to call repeatedly; always cancels old ones first.
   Future<void> scheduleStreakReminders(StreakData streak) async {
     await _plugin.cancel(id: _streakReminderId);
@@ -344,14 +262,12 @@ class NotificationService {
     final streakCount = streak.currentStreak;
     final scheduleMode = await _resolveScheduleMode();
 
-    // 1. Safety reminder at 8 PM the next day
-    //    e.g. opened Monday → reminder Tuesday 8 PM (4h before deadline)
     final reminderTime = tz.TZDateTime(
       tz.local,
       lastOpen.year,
       lastOpen.month,
-      lastOpen.day + 1, // next day
-      20, // 8:00 PM
+      lastOpen.day + 1,
+      20,
     );
 
     if (reminderTime.isAfter(now)) {
@@ -365,13 +281,12 @@ class NotificationService {
       );
     }
 
-    // 2. Streak-broken alert at 9 PM the day after the deadline (Emergency)
     final breakTime = tz.TZDateTime(
       tz.local,
       lastOpen.year,
       lastOpen.month,
-      lastOpen.day + 2, // two days later
-      9, // 9:00 AM
+      lastOpen.day + 2,
+      9,
     );
 
     if (breakTime.isAfter(now)) {
@@ -426,51 +341,30 @@ class NotificationService {
         "Don't let $count days of wisdom slip away tonight!";
   }
 
-  // Notification Details — Quiet (Quotes) vs. Loud (Alerts)
+  // ── Test Scheduling ──────────────────────────────────────────────────────
 
-  // ── Debug Testing ────────────────────────────────────────────────────────
+  /// Schedule a test quote notification [minutes] from now.
+  Future<void> scheduleTestQuote(Quote quote, int minutes) async {
+    await _plugin.cancel(id: _testQuoteId);
 
-  /// Immediate fire of a "daily quote" style notification.
-  Future<void> testDailyQuote() async {
-    const testText = 'The only way to do great work is to love what you do.';
-    const testAuthor = 'Steve Jobs';
-    await _plugin.show(
-      id: 999,
+    final scheduledDate = tz.TZDateTime.now(tz.local).add(
+      Duration(minutes: minutes),
+    );
+    final scheduleMode = await _resolveScheduleMode();
+
+    await _plugin.zonedSchedule(
+      id: _testQuoteId,
       title: 'Quote of the Day',
-      body: '"$testText" — $testAuthor',
+      body: '"${quote.text}" — ${quote.author}',
+      scheduledDate: scheduledDate,
       notificationDetails: _quoteDetails(
-        bigText: '"$testText"\n\n— $testAuthor',
+        bigText: '"${quote.text}"\n\n— ${quote.author}',
       ),
+      androidScheduleMode: scheduleMode,
     );
-  }
 
-  /// Immediate fire of an 8 PM-style streak reminder.
-  Future<void> testStreakReminder() async {
-    await _plugin.show(
-      id: 998,
-      title: 'Keep the flame alive 🔥',
-      body: "Don't let your 7-day streak flicker out!",
-      notificationDetails: _alertDetails(),
-    );
-  }
-
-  /// Immediate fire of a 9 AM-style streak break alarm.
-  Future<void> testStreakBreak() async {
-    await _plugin.show(
-      id: 997,
-      title: 'The flame has gone out',
-      body:
-          'Your streak was lost to time yesterday. '
-          'Relight the flame now to restore your progress.',
-      notificationDetails: _alertDetails(),
-    );
-  }
-
-  /// Immediate fire of a success alert.
-  Future<void> testStreakRestored() async {
-    await showInstantAlert(
-      'Streak Restored!',
-      'You are back to a 7-day streak.',
+    debugPrint(
+      '[NotificationService] Test notification scheduled for $scheduledDate',
     );
   }
 

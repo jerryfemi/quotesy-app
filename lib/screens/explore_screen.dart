@@ -1,9 +1,12 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/category_style.dart';
 import '../services/database_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/quotesy_nav_bar.dart';
 import '../widgets/reactive_light_card.dart';
 import '../theme/quotesy_theme.dart';
@@ -42,9 +45,85 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   void _openCategory(String category) {
     HapticFeedback.lightImpact();
-    // URI-encode so spaces and & in category names are path-safe.
     final encoded = Uri.encodeComponent(category);
     context.push('/category/$encoded');
+  }
+
+  void _showTestNotificationSheet() {
+    HapticFeedback.mediumImpact();
+    final db = DatabaseService();
+    final quotes = db.getAllQuotes();
+    if (quotes.isEmpty) return;
+
+    final options = [1, 2, 3, 5];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: QColors.obsidian,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Test Notification',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                    color: QColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Schedule a quote notification to test delivery.',
+                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                    color: QColors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ...options.map((minutes) {
+                  final label = minutes == 1
+                      ? 'In 1 minute'
+                      : 'In $minutes minutes';
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      Icons.schedule_rounded,
+                      color: QColors.amberGlow,
+                    ),
+                    title: Text(
+                      label,
+                      style: TextStyle(color: QColors.textPrimary),
+                    ),
+                    onTap: () async {
+                      final quote = quotes[Random().nextInt(quotes.length)];
+                      await NotificationService().scheduleTestQuote(
+                        quote,
+                        minutes,
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Notification scheduled $label'),
+                            backgroundColor: QColors.cardBase,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -62,9 +141,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return Scaffold(
       backgroundColor: QColors.obsidian,
       appBar: AppBar(
-        title:Text(
+        title: GestureDetector(
+          onLongPress: _showTestNotificationSheet,
+          child: Text(
             'Explore',
             style: Theme.of(context).textTheme.headlineMedium,
+          ),
         ),
       ),
       body: NotificationListener<ScrollNotification>(
